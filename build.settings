@@ -1,0 +1,83 @@
+settings =
+{
+    android =
+    {
+        usesPermissions =
+        {
+        },
+    },
+
+    orientation =
+    {
+        orientation =
+        {
+                default = "portrait",
+                supported =
+                {
+                        "portrait", "portraitUpsideDown",
+                },
+        },
+
+    },
+
+
+    iphone =
+    {
+        components = {},
+
+        plist =
+        {
+            --CFBundleIdentifier = "com.appledts.GKTapper", -- temporary line for testing!
+
+            CFBundleIdentifier = "ie.michaelpiercy.matchme",
+
+            UIAppFonts =
+            {
+                "GROBOLD.ttf"
+            },
+
+            UIInterfaceOrientation = "UIInterfaceOrientationPortrait",
+
+            UISupportedInterfaceOrientations =
+            {
+                "UIInterfaceOrientationPortrait",
+                "UIInterfaceOrientationPortraitUpsideDown"
+            },
+
+            UIApplicationExitsOnSuspend = true,
+
+            UIStatusBarHidden = true,
+
+            UIPrerenderedIcon = true,
+
+            CFBundleIconFiles=
+            {
+                "Icon-60.png",
+                "Icon-60@2x.png",
+                "Icon-72.png",
+                "Icon-72@2x.png",
+                "Icon-76.png",
+                "Icon-76@2x.png",
+                "Icon-Small-40.png",
+                "Icon-Small-40@2x.png",
+                "Icon-Small-50.png",
+                "Icon-Small-50@2x.png",
+                "Icon-Small.png",
+                "Icon-Small@2x.png",
+                "Icon.png",
+                "Icon@2x.png"
+            },
+
+            UIApplicationExitsOnSuspend = false,
+
+            FacebookAppID = "308076795961985",
+
+            CFBundleURLTypes = {
+                {
+                CFBundleURLSchemes = { "fb308076795961985", }
+                }
+            }
+
+        }
+    }
+}
