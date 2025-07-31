@@ -178,43 +178,52 @@ function UIManager:createChatContainer()
         return false
     end
     
+    -- Create the main chat container as a display group
     self.state.chatContainer = display.newGroup()
     if not self.state.chatContainer then
         print("Error: Failed to create chat container")
         return false
     end
     
-    -- Position chat container properly
-    self.state.chatContainer.x = self.state.displayWidth/2
-    self.state.chatContainer.y = self.state.displayHeight/2 - 50  -- Moved up for better visibility
+    -- Position the chat container in the center of the screen
+    self.state.chatContainer.x = self.state.displayWidth / 2
+    self.state.chatContainer.y = self.state.displayHeight / 2 - 50
     self.state.chatContainer.width = self.state.displayWidth - 40
-    self.state.chatContainer.height = self.state.displayHeight - 250  -- Increased height
+    self.state.chatContainer.height = self.state.displayHeight - 250
     
-    -- Create chat background
+    debugPrint("Chat container created at position: " .. self.state.chatContainer.x .. ", " .. self.state.chatContainer.y)
+    debugPrint("Chat container size: " .. self.state.chatContainer.width .. " x " .. self.state.chatContainer.height)
+    
+    -- Create a visible background for the chat area
     ---@type DisplayObject
-    local chatBackground = display.newRoundedRect(self.state.chatContainer.x, self.state.chatContainer.y, self.state.chatContainer.width, self.state.chatContainer.height, 10)
+    local chatBackground = display.newRoundedRect(0, 0, self.state.chatContainer.width, self.state.chatContainer.height, 10)
     if chatBackground then
-        chatBackground:setFillColor(0.95, 0.95, 0.95, 0.3)
-        chatBackground:setStrokeColor(0.8, 0.8, 0.8, 0.5)
-        chatBackground.strokeWidth = 1
+        chatBackground:setFillColor(0.95, 0.95, 0.95, 0.8)  -- More visible background
+        chatBackground:setStrokeColor(0.7, 0.7, 0.7, 1)      -- Visible border
+        chatBackground.strokeWidth = 2
         self.state.chatContainer:insert(chatBackground)
+        debugPrint("Chat background created")
     end
     
-    -- Create messages group
+    -- Create messages group as a separate display group
     self.state.chatContainer.messagesGroup = display.newGroup()
     if self.state.chatContainer.messagesGroup then
-        self.state.chatContainer.messagesGroup.x = self.state.chatContainer.x
-        self.state.chatContainer.messagesGroup.y = self.state.chatContainer.y
+        -- Position messages group relative to chat container
+        self.state.chatContainer.messagesGroup.x = 0
+        self.state.chatContainer.messagesGroup.y = 0
         self.state.chatContainer.messagesGroup.width = self.state.chatContainer.width - 20
         self.state.chatContainer.messagesGroup.height = self.state.chatContainer.height - 20
+        
+        -- Insert messages group into chat container
         self.state.chatContainer:insert(self.state.chatContainer.messagesGroup)
+        debugPrint("Messages group created and inserted")
     end
     
     -- Initialize message tracking
     self.state.chatContainer.currentY = 10
     self.state.chatContainer.maxY = self.state.chatContainer.height - 20
     
-    debugPrint("Chat container created at position: " .. self.state.chatContainer.x .. ", " .. self.state.chatContainer.y)
+    debugPrint("Chat container setup complete - Messages group children: " .. (self.state.chatContainer.messagesGroup and self.state.chatContainer.messagesGroup.numChildren or 0))
     return true
 end
 
@@ -620,6 +629,7 @@ function UIManager:addChatBubble(text, isUser)
     end
     
     debugPrint("Adding chat bubble: " .. (isUser and "User" or "AI") .. " - " .. text)
+    debugPrint("Messages group children before: " .. self.state.chatContainer.messagesGroup.numChildren)
     
     ---@class BubbleStyle
     ---@field backgroundColor number[] Background color RGBA values
@@ -630,13 +640,13 @@ function UIManager:addChatBubble(text, isUser)
     ---@type table<string, BubbleStyle>
     local bubbleStyle = {
         userBubble = {
-            backgroundColor = {0.2, 0.6, 1.0, 0.9},
+            backgroundColor = {0.2, 0.6, 1.0, 1.0},  -- More opaque blue
             textColor = {1, 1, 1, 1},
             cornerRadius = 15,
             maxWidth = 250
         },
         aiBubble = {
-            backgroundColor = {0.9, 0.9, 0.9, 0.9},
+            backgroundColor = {0.9, 0.9, 0.9, 1.0},  -- More opaque gray
             textColor = {0.2, 0.2, 0.2, 1},
             cornerRadius = 15,
             maxWidth = 250
@@ -645,7 +655,7 @@ function UIManager:addChatBubble(text, isUser)
     
     local style = isUser and bubbleStyle.userBubble or bubbleStyle.aiBubble
     
-    -- Create bubble background
+    -- Create bubble background with more visible styling
     ---@type DisplayObject
     local bubble = display.newRoundedRect(0, 0, style.maxWidth, 60, style.cornerRadius)
     if not bubble then
@@ -654,10 +664,10 @@ function UIManager:addChatBubble(text, isUser)
     end
     
     bubble:setFillColor(unpack(style.backgroundColor))
-    bubble:setStrokeColor(0.7, 0.7, 0.7, 0.5)
-    bubble.strokeWidth = 1
+    bubble:setStrokeColor(0.5, 0.5, 0.5, 1)  -- More visible border
+    bubble.strokeWidth = 2
     
-    -- Create text
+    -- Create text with better visibility
     ---@type TextObject
     local textObj = display.newText({
         text = text,
@@ -683,9 +693,9 @@ function UIManager:addChatBubble(text, isUser)
         bubbleGroup:insert(bubble)
         bubbleGroup:insert(textObj)
         
-        -- Position bubble properly
+        -- Position bubble properly within the messages group
         if isUser then
-            bubbleGroup.x = self.state.chatContainer.width - bubble.width/2 - 20
+            bubbleGroup.x = self.state.chatContainer.messagesGroup.width - bubble.width/2 - 20
         else
             bubbleGroup.x = bubble.width/2 + 20
         end
@@ -697,6 +707,7 @@ function UIManager:addChatBubble(text, isUser)
         self.state.chatContainer.messagesGroup:insert(bubbleGroup)
         
         debugPrint("Bubble positioned at: " .. bubbleGroup.x .. ", " .. bubbleGroup.y)
+        debugPrint("Messages group children after: " .. self.state.chatContainer.messagesGroup.numChildren)
         
         -- Update current Y position
         self.state.chatContainer.currentY = self.state.chatContainer.currentY + 80
@@ -783,8 +794,8 @@ function UIManager:handleClearMemory()
         self.state.chatContainer.messagesGroup:removeSelf()
         self.state.chatContainer.messagesGroup = display.newGroup()
         if self.state.chatContainer.messagesGroup then
-            self.state.chatContainer.messagesGroup.x = self.state.chatContainer.x
-            self.state.chatContainer.messagesGroup.y = self.state.chatContainer.y
+            self.state.chatContainer.messagesGroup.x = 0
+            self.state.chatContainer.messagesGroup.y = 0
             self.state.chatContainer:insert(self.state.chatContainer.messagesGroup)
             self.state.chatContainer.currentY = 10
         end

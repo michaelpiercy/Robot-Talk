@@ -254,6 +254,39 @@ local function createPersonalitySelector()
 end
 
 -- ============================================================================
+-- TEST FUNCTIONS
+-- ============================================================================
+
+-- Test chat bubble creation
+---@return boolean success Whether the test was successful
+local function testChatBubbles()
+    if not app.modules.uiManager then
+        debugPrint("✗ UI Manager not available for testing")
+        return false
+    end
+    
+    debugPrint("Testing chat bubble creation...")
+    
+    -- Test user bubble
+    local userSuccess = safeCall(app.modules.uiManager.addChatBubble, app.modules.uiManager, "This is a test user message", true)
+    if userSuccess then
+        debugPrint("✓ User chat bubble test successful")
+    else
+        debugPrint("✗ User chat bubble test failed")
+    end
+    
+    -- Test AI bubble
+    local aiSuccess = safeCall(app.modules.uiManager.addChatBubble, app.modules.uiManager, "This is a test AI response", false)
+    if aiSuccess then
+        debugPrint("✓ AI chat bubble test successful")
+    else
+        debugPrint("✗ AI chat bubble test failed")
+    end
+    
+    return userSuccess and aiSuccess
+end
+
+-- ============================================================================
 -- APPLICATION INITIALIZATION (EXECUTION ORDER)
 -- ============================================================================
 
@@ -359,8 +392,13 @@ local function initApp()
         app.personalityButtons[1]:setFillColor(0.2, 0.6, 1.0, 0.9)
     end
     
-    -- Step 7: Add welcome message with proper timing
-    timer.performWithDelay(500, function()
+    -- Step 7: Test chat bubbles
+    timer.performWithDelay(1000, function()
+        testChatBubbles()
+    end)
+    
+    -- Step 8: Add welcome message with proper timing
+    timer.performWithDelay(2000, function()
         if app.isShuttingDown then return end
         
         if app.modules.uiManager and app.modules.uiManager.addChatBubble then
@@ -368,7 +406,7 @@ local function initApp()
         end
     end)
     
-    -- Step 8: Add system info
+    -- Step 9: Add system info
     ---@type TextObject
     local systemInfo = display.newText({
         text = "AI System v2.0 - Enhanced LLM with Memory & Context",
@@ -381,7 +419,7 @@ local function initApp()
         systemInfo:setFillColor(0.5, 0.5, 0.5, 1)
     end
     
-    -- Step 9: Mark initialization complete
+    -- Step 10: Mark initialization complete
     app.isInitialized = true
     debugPrint("✓ AI Assistant initialized successfully!")
     return true
