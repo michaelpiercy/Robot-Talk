@@ -1,221 +1,269 @@
--- LLM Core for Caleb's AI Assistant
--- Solar2D compatible implementation
+-- LLM Core Module for Caleb's AI Assistant
+-- Expert-level Solar2D implementation with comprehensive error handling
 
 local LLMCore = {}
 
--- Conversation memory
+-- Memory and state management
 local conversationHistory = {}
 local contextMemory = {}
 local userPreferences = {}
+local conversationCount = 0
 
--- Response templates and patterns
+-- Response patterns for different intents
 local responsePatterns = {
     greeting = {
-        patterns = {"hello", "hi", "hey", "good morning", "good afternoon", "good evening"},
-        responses = {
-            "Hello! I'm Caleb's AI assistant. How can I help you today?",
-            "Hi there! I'm here to assist you with any questions.",
-            "Greetings! I'm ready to help with whatever you need.",
-            "Hello! What would you like to know?"
-        }
+        "Hello! How can I help you today?",
+        "Hi there! What would you like to know?",
+        "Greetings! I'm here to assist you.",
+        "Welcome! How may I be of service?"
     },
     farewell = {
-        patterns = {"bye", "goodbye", "see you", "later", "exit", "quit"},
-        responses = {
-            "Goodbye! It was nice talking with you.",
-            "See you later! Feel free to come back anytime.",
-            "Take care! I'll be here when you need me.",
-            "Bye! Have a great day!"
-        }
+        "Goodbye! Have a great day!",
+        "See you later! Feel free to ask more questions.",
+        "Take care! I'm here when you need me.",
+        "Farewell! Don't hesitate to return."
     },
     question = {
-        patterns = {"what", "how", "why", "when", "where", "who", "which"},
-        responses = {
-            "That's an interesting question. Let me think about that...",
-            "I'd be happy to help you with that.",
-            "That's a great question. Here's what I know...",
-            "Let me provide you with some information on that."
-        }
+        "That's an interesting question!",
+        "Let me think about that...",
+        "Great question! Here's what I know:",
+        "I'd be happy to help with that."
     },
-    gratitude = {
-        patterns = {"thank", "thanks", "appreciate"},
-        responses = {
-            "You're welcome! I'm glad I could help.",
-            "My pleasure! Is there anything else you'd like to know?",
-            "You're very welcome! Feel free to ask more questions.",
-            "Anytime! I'm here to help."
-        }
+    statement = {
+        "I understand what you're saying.",
+        "That's a good point!",
+        "Thanks for sharing that.",
+        "I see what you mean."
     },
-    weather = {
-        patterns = {"weather", "temperature", "rain", "sunny", "cold", "hot"},
-        responses = {
-            "I can't check real-time weather, but I can help you find weather apps or websites!",
-            "For current weather information, I'd recommend checking a weather service.",
-            "Weather conditions change frequently. You might want to check a local weather service."
-        }
-    },
-    time = {
-        patterns = {"time", "clock", "hour", "minute"},
-        responses = {
-            "I can't tell you the exact time, but you can check your device's clock!",
-            "For the current time, please look at your device's clock or calendar.",
-            "Time is relative, but your device should show you the current time."
-        }
-    },
-    math = {
-        patterns = {"calculate", "math", "add", "subtract", "multiply", "divide", "sum", "plus", "minus"},
-        responses = {
-            "I can help with basic math concepts, but for calculations you might want to use a calculator.",
-            "Math is fascinating! What specific calculation are you thinking about?",
-            "I can discuss mathematical concepts, but for actual calculations, a calculator would be more precise."
-        }
+    confusion = {
+        "I'm not quite sure I understand. Could you clarify?",
+        "That's a bit unclear to me. Can you explain more?",
+        "I'd like to help, but I need more information.",
+        "Could you rephrase that for me?"
     }
 }
 
--- Analyze input
+-- Safe module loading function
+local function safeRequire(modulePath)
+    local success, result = pcall(require, modulePath)
+    if success then
+        return result
+    else
+        print("Warning: Failed to load module:", modulePath, "-", result)
+        return nil
+    end
+end
+
+-- Input validation function
+local function validateInput(input)
+    if not input then return false, "No input provided" end
+    if type(input) ~= "string" then return false, "Invalid input type" end
+    if string.len(input) == 0 then return false, "Empty input" end
+    if string.len(input) > 2000 then return false, "Input too long" end
+    
+    -- Sanitize input - remove dangerous characters
+    local sanitized = string.gsub(input, "[<>\"']", "")
+    if sanitized ~= input then
+        print("Warning: Input sanitized")
+    end
+    
+    return true, sanitized
+end
+
+-- Analyze input for intent and sentiment
 function LLMCore:analyzeInput(input)
     if not input then
+        print("Warning: No input provided for analysis")
         return {
-            intent = "general",
-            confidence = 0,
+            intent = "confusion",
+            sentiment = "neutral",
             keywords = {},
-            sentiment = "neutral"
+            confidence = 0
         }
     end
     
     local inputLower = string.lower(input)
     local analysis = {
-        intent = "general",
-        confidence = 0,
+        intent = "statement",
+        sentiment = "neutral",
         keywords = {},
-        sentiment = "neutral"
+        confidence = 0.5
     }
     
     -- Extract keywords
-    for word in inputLower:gmatch("%w+") do
-        table.insert(analysis.keywords, word)
+    local words = {}
+    for word in string.gmatch(inputLower, "%w+") do
+        if string.len(word) > 2 then
+            table.insert(words, word)
+        end
     end
+    analysis.keywords = words
     
-    -- Determine intent based on patterns
-    for intent, data in pairs(responsePatterns) do
-        for _, pattern in ipairs(data.patterns) do
-            if inputLower:find(pattern) then
-                analysis.intent = intent
-                analysis.confidence = analysis.confidence + 0.3
-                break
-            end
+    -- Detect intent
+    local greetingWords = {"hello", "hi", "hey", "greetings", "good morning", "good afternoon", "good evening"}
+    local farewellWords = {"goodbye", "bye", "see you", "farewell", "later", "good night"}
+    local questionWords = {"what", "how", "why", "when", "where", "who", "which", "?"}
+    
+    for _, word in ipairs(greetingWords) do
+        if string.find(inputLower, word) then
+            analysis.intent = "greeting"
+            analysis.confidence = 0.8
+            break
         end
     end
     
-    -- Basic sentiment analysis
-    local positiveWords = {"good", "great", "awesome", "amazing", "love", "like", "happy", "excellent"}
-    local negativeWords = {"bad", "terrible", "hate", "awful", "sad", "angry", "dislike", "horrible"}
+    for _, word in ipairs(farewellWords) do
+        if string.find(inputLower, word) then
+            analysis.intent = "farewell"
+            analysis.confidence = 0.8
+            break
+        end
+    end
+    
+    for _, word in ipairs(questionWords) do
+        if string.find(inputLower, word) then
+            analysis.intent = "question"
+            analysis.confidence = 0.7
+            break
+        end
+    end
+    
+    -- Analyze sentiment
+    local positiveWords = {"good", "great", "awesome", "excellent", "amazing", "love", "like", "happy", "excited", "wonderful", "fantastic"}
+    local negativeWords = {"bad", "terrible", "awful", "hate", "dislike", "sad", "angry", "frustrated", "horrible", "worst"}
+    
+    local positiveCount = 0
+    local negativeCount = 0
     
     for _, word in ipairs(positiveWords) do
-        if inputLower:find(word) then
-            analysis.sentiment = "positive"
-            break
+        if string.find(inputLower, word) then
+            positiveCount = positiveCount + 1
         end
     end
     
     for _, word in ipairs(negativeWords) do
-        if inputLower:find(word) then
-            analysis.sentiment = "negative"
-            break
+        if string.find(inputLower, word) then
+            negativeCount = negativeCount + 1
         end
+    end
+    
+    if positiveCount > negativeCount then
+        analysis.sentiment = "positive"
+    elseif negativeCount > positiveCount then
+        analysis.sentiment = "negative"
     end
     
     return analysis
 end
 
--- Generate response
-function LLMCore:generateResponse(input, analysis)
+-- Generate response based on intent and context
+function LLMCore:generateResponse(analysis, context)
+    if not analysis or not analysis.intent then
+        print("Warning: Invalid analysis for response generation")
+        return "I'm here to help!"
+    end
+    
     local response = ""
     
-    -- Get context from conversation history
-    local context = self:getContext()
-    
-    -- Try to use knowledge base for intelligent responses
-    local success, KnowledgeBase = pcall(require, "Definitions.knowledge_base")
-    if success then
-        local knowledgeResponse = KnowledgeBase:generateIntelligentResponse(input)
+    -- Try to get knowledge-based response first
+    local KnowledgeBase = safeRequire("Definitions.knowledge_base")
+    if KnowledgeBase then
+        local knowledgeResponse = KnowledgeBase:generateIntelligentResponse(analysis.keywords)
         if knowledgeResponse and knowledgeResponse ~= "" then
             response = knowledgeResponse
         end
     end
     
-    -- If no knowledge base response, use pattern matching
+    -- Fallback to pattern-based response
     if response == "" then
-        if responsePatterns[analysis.intent] then
-            local responses = responsePatterns[analysis.intent].responses
-            response = responses[math.random(1, #responses)]
+        local patterns = responsePatterns[analysis.intent]
+        if patterns and #patterns > 0 then
+            response = patterns[math.random(1, #patterns)]
         else
-            -- Default responses for general conversation
-            local generalResponses = {
-                "That's interesting! Tell me more about that.",
-                "I see what you mean. What are your thoughts on that?",
-                "That's a good point. How do you feel about it?",
-                "I understand. Is there anything specific you'd like to discuss?",
-                "That's fascinating! I'd love to hear more.",
-                "I see. What would you like to explore further?"
-            }
-            response = generalResponses[math.random(1, #generalResponses)]
+            response = "I understand what you're saying."
         end
     end
     
-    -- Add contextual information if available
+    -- Add context-aware elements
     if context and context.lastTopic then
-        response = response .. " By the way, you mentioned " .. context.lastTopic .. " earlier."
-    end
-    
-    -- Add sentiment-appropriate response
-    if analysis.sentiment == "positive" then
-        response = response .. " I'm glad you're feeling positive about this!"
-    elseif analysis.sentiment == "negative" then
-        response = response .. " I understand this might be challenging. Is there anything I can do to help?"
+        response = response .. " Regarding " .. context.lastTopic .. ", "
     end
     
     return response
 end
 
--- Get context
+-- Get context from conversation history
 function LLMCore:getContext()
+    local context = {
+        lastTopic = nil,
+        conversationLength = #conversationHistory,
+        userMood = "neutral",
+        commonTopics = {}
+    }
+    
     if #conversationHistory > 0 then
-        return {
-            lastTopic = conversationHistory[#conversationHistory].keywords[1],
-            conversationLength = #conversationHistory,
-            userMood = conversationHistory[#conversationHistory].sentiment
-        }
-    end
-    return nil
-end
-
--- Process input
-function LLMCore:processInput(userInput)
-    if not userInput then
-        return "I didn't catch that. Could you please repeat?"
+        local lastMessage = conversationHistory[#conversationHistory]
+        if lastMessage and lastMessage.keywords then
+            context.lastTopic = lastMessage.keywords[1]
+        end
     end
     
-    -- Analyze the input
-    local analysis = self:analyzeInput(userInput)
+    -- Analyze common topics
+    local topicCount = {}
+    for _, message in ipairs(conversationHistory) do
+        if message.keywords then
+            for _, keyword in ipairs(message.keywords) do
+                topicCount[keyword] = (topicCount[keyword] or 0) + 1
+            end
+        end
+    end
+    
+    -- Get top 3 topics
+    local topics = {}
+    for topic, count in pairs(topicCount) do
+        table.insert(topics, {topic = topic, count = count})
+    end
+    table.sort(topics, function(a, b) return a.count > b.count end)
+    
+    for i = 1, math.min(3, #topics) do
+        table.insert(context.commonTopics, topics[i].topic)
+    end
+    
+    return context
+end
+
+-- Process user input and generate response
+function LLMCore:processInput(input)
+    local isValid, sanitizedInput = validateInput(input)
+    if not isValid then
+        print("Input validation failed:", sanitizedInput)
+        return "I didn't understand that. Could you please rephrase?"
+    end
+    
+    -- Analyze input
+    local analysis = self:analyzeInput(sanitizedInput)
+    
+    -- Get context
+    local context = self:getContext()
+    
+    -- Generate response
+    local response = self:generateResponse(analysis, context)
     
     -- Store in conversation history
     table.insert(conversationHistory, {
-        input = userInput,
+        input = sanitizedInput,
+        response = response,
         analysis = analysis,
         timestamp = os.time()
     })
     
-    -- Generate response
-    local response = self:generateResponse(userInput, analysis)
+    -- Update conversation count
+    conversationCount = conversationCount + 1
     
-    -- Store response in history
-    table.insert(conversationHistory, {
-        input = response,
-        analysis = {intent = "response", confidence = 1, keywords = {}, sentiment = "neutral"},
-        timestamp = os.time(),
-        isResponse = true
-    })
+    -- Limit history size
+    if #conversationHistory > 50 then
+        table.remove(conversationHistory, 1)
+    end
     
     return response
 end
@@ -229,15 +277,84 @@ end
 function LLMCore:clearMemory()
     conversationHistory = {}
     contextMemory = {}
+    userPreferences = {}
+    conversationCount = 0
+    print("Memory cleared successfully")
 end
 
--- Get memory stats
+-- Get memory statistics
 function LLMCore:getMemoryStats()
     return {
-        conversationCount = #conversationHistory,
-        memorySize = #conversationHistory * 100, -- Rough estimate
-        lastInteraction = conversationHistory[#conversationHistory] and conversationHistory[#conversationHistory].timestamp or 0
+        conversationCount = conversationCount,
+        historySize = #conversationHistory,
+        contextSize = #contextMemory,
+        preferencesSize = #userPreferences
     }
+end
+
+-- Add to context memory
+function LLMCore:addToContext(key, value)
+    if not key or not value then
+        print("Warning: Invalid context data")
+        return false
+    end
+    
+    contextMemory[key] = {
+        value = value,
+        timestamp = os.time()
+    }
+    
+    return true
+end
+
+-- Get from context memory
+function LLMCore:getFromContext(key)
+    if not key then
+        return nil
+    end
+    
+    local context = contextMemory[key]
+    if context then
+        return context.value
+    end
+    
+    return nil
+end
+
+-- Add user preference
+function LLMCore:addUserPreference(preference, value)
+    if not preference or not value then
+        print("Warning: Invalid preference data")
+        return false
+    end
+    
+    userPreferences[preference] = {
+        value = value,
+        timestamp = os.time()
+    }
+    
+    return true
+end
+
+-- Get user preference
+function LLMCore:getUserPreference(preference)
+    if not preference then
+        return nil
+    end
+    
+    local pref = userPreferences[preference]
+    if pref then
+        return pref.value
+    end
+    
+    return nil
+end
+
+-- Constructor
+function LLMCore:new()
+    local llm = {}
+    setmetatable(llm, { __index = LLMCore })
+    return llm
 end
 
 return LLMCore

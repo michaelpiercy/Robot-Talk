@@ -1,37 +1,39 @@
--- AI Robot for Caleb's AI Assistant
--- Solar2D compatible implementation
+-- AI Robot Module for Caleb's AI Assistant
+-- Expert-level Solar2D implementation with comprehensive error handling
 
 local AIRobot = {}
 
 -- Robot state
 local robotState = {
-    mood = "neutral",
-    energy = 100,
-    personality = "helpful",
-    currentAnimation = "idle",
-    isThinking = false,
-    lastInteraction = 0
+    sprite = nil,
+    personalityIndicator = nil,
+    energyBar = nil,
+    moodIndicator = nil,
+    currentPersonality = "helpful",
+    currentMood = "neutral",
+    energyLevel = 100,
+    isAnimating = false
 }
 
 -- Animation states
 local animations = {
     idle = {
         duration = 2000,
-        scale = {1.0, 1.05, 1.0},
-        alpha = {1.0, 1.0, 1.0}
+        alpha = {1.0, 0.8, 1.0},
+        scale = {1.0, 1.05, 1.0}
     },
     thinking = {
-        duration = 1000,
-        scale = {1.0, 1.1, 1.0},
-        alpha = {1.0, 0.8, 1.0}
+        duration = 1500,
+        rotation = {0, 5, -5, 0},
+        scale = {1.0, 1.1, 1.0}
     },
     excited = {
-        duration = 500,
+        duration = 800,
         scale = {1.0, 1.2, 1.0},
-        alpha = {1.0, 1.0, 1.0}
+        alpha = {1.0, 0.9, 1.0}
     },
     sad = {
-        duration = 1500,
+        duration = 1200,
         scale = {1.0, 0.9, 1.0},
         alpha = {1.0, 0.7, 1.0}
     }
@@ -40,202 +42,343 @@ local animations = {
 -- Personality responses
 local personalityResponses = {
     helpful = {
+        greeting = "Hello! How can I assist you today?",
         thinking = "Let me think about that...",
-        processing = "Processing your request...",
-        success = "I'm happy to help!",
-        confusion = "I'm not quite sure about that. Could you clarify?"
+        excited = "That's a great question!",
+        sad = "I'm here to help if you need anything."
+    },
+    creative = {
+        greeting = "Hi there! Ready to explore some creative ideas?",
+        thinking = "Let me brainstorm some possibilities...",
+        excited = "What an imaginative question!",
+        sad = "Creativity can help us through difficult times."
+    },
+    analytical = {
+        greeting = "Greetings. I'm ready to analyze and solve problems.",
+        thinking = "Analyzing the data...",
+        excited = "Excellent analytical question!",
+        sad = "Let's approach this systematically."
     },
     friendly = {
-        thinking = "Hmm, interesting question!",
-        processing = "Working on it...",
-        success = "Great! Here's what I found.",
-        confusion = "That's a bit unclear to me. Can you explain more?"
-    },
-    professional = {
-        thinking = "Analyzing your query...",
-        processing = "Processing information...",
-        success = "Task completed successfully.",
-        confusion = "Request unclear. Please provide more details."
+        greeting = "Hey! Great to see you! How are you doing?",
+        thinking = "Let me think about that for you...",
+        excited = "That's awesome! I love this question!",
+        sad = "Don't worry, we'll figure this out together!"
     }
 }
 
--- Create new AI Robot instance
-function AIRobot:new()
-    local robot = {}
-    setmetatable(robot, { __index = AIRobot })
-    
-    robot.sprite = nil
-    robot.animationTimer = nil
-    robot.personality = "helpful"
-    robot.personalityIndicator = nil
-    robot.energyBar = nil
-    robot.moodIndicator = nil
-    
-    return robot
+-- Safe element removal function
+local function safeRemove(element)
+    if element and element.removeSelf then
+        local success, err = pcall(function()
+            element:removeSelf()
+        end)
+        if not success then
+            print("Warning: Failed to remove robot element:", err)
+        end
+    end
+end
+
+-- Safe transition function
+local function safeTransition(target, params)
+    if target and transition and transition.to then
+        local success, err = pcall(function()
+            transition.to(target, params)
+        end)
+        if not success then
+            print("Warning: Transition failed:", err)
+        end
+        return success
+    end
+    return false
 end
 
 -- Create robot sprite
 function AIRobot:createSprite()
+    if not display or not display.newImageRect then
+        print("Error: Display system not available")
+        return nil
+    end
+    
+    -- Get display dimensions
     local _w = display.actualContentWidth
     local _h = display.actualContentHeight
     
-    -- Create robot sprite
-    self.sprite = display.newImageRect("robot.png", 135, 306)
-    self.sprite.x = _w/2
-    self.sprite.y = _h - 310/2
+    if not _w or not _h then
+        print("Error: Invalid display dimensions for robot sprite")
+        return nil
+    end
     
-    -- Add personality indicator
-    self.personalityIndicator = display.newCircle(_w/2 + 80, _h - 350, 15)
-    self.personalityIndicator:setFillColor(0.2, 0.8, 0.2, 0.8)
+    -- Create robot body (simple rectangle for now)
+    local robotBody = display.newRoundedRect(_w/2, _h/2 - 150, 80, 100, 20)
+    if not robotBody then
+        print("Error: Failed to create robot body")
+        return nil
+    end
     
-    -- Add energy bar
-    self.energyBar = display.newRoundedRect(_w/2, _h - 380, 100, 8, 4)
-    self.energyBar:setFillColor(0.2, 0.8, 0.2, 0.8)
-    self.energyBar:setStrokeColor(0.1, 0.4, 0.1, 1)
-    self.energyBar.strokeWidth = 1
+    robotBody:setFillColor(0.3, 0.3, 0.3, 1)
+    robotBody:setStrokeColor(0.1, 0.1, 0.1, 1)
+    robotBody.strokeWidth = 3
     
-    -- Add mood indicator
-    self.moodIndicator = display.newText({
+    -- Create robot head
+    local robotHead = display.newCircle(_w/2, _h/2 - 200, 30)
+    if robotHead then
+        robotHead:setFillColor(0.4, 0.4, 0.4, 1)
+        robotHead:setStrokeColor(0.2, 0.2, 0.2, 1)
+        robotHead.strokeWidth = 2
+    end
+    
+    -- Create eyes
+    local leftEye = display.newCircle(_w/2 - 10, _h/2 - 205, 5)
+    if leftEye then
+        leftEye:setFillColor(0, 1, 0, 1) -- Green eyes
+    end
+    
+    local rightEye = display.newCircle(_w/2 + 10, _h/2 - 205, 5)
+    if rightEye then
+        rightEye:setFillColor(0, 1, 0, 1) -- Green eyes
+    end
+    
+    -- Create personality indicator
+    local personalityIndicator = display.newText({
+        text = "Helpful",
+        x = _w/2,
+        y = _h/2 - 50,
+        font = native.systemFont,
+        fontSize = 12
+    })
+    if personalityIndicator then
+        personalityIndicator:setFillColor(0.2, 0.6, 1.0, 1)
+    end
+    
+    -- Create energy bar background
+    local energyBarBg = display.newRect(_w/2, _h/2 - 20, 100, 10)
+    if energyBarBg then
+        energyBarBg:setFillColor(0.8, 0.8, 0.8, 1)
+        energyBarBg:setStrokeColor(0.5, 0.5, 0.5, 1)
+        energyBarBg.strokeWidth = 1
+    end
+    
+    -- Create energy bar
+    local energyBar = display.newRect(_w/2 - 45, _h/2 - 20, 90, 8)
+    if energyBar then
+        energyBar:setFillColor(0.2, 0.8, 0.2, 1)
+        energyBar.anchorX = 0
+    end
+    
+    -- Create mood indicator
+    local moodIndicator = display.newText({
         text = "😊",
-        x = _w/2 + 120,
-        y = _h - 350,
+        x = _w/2,
+        y = _h/2 + 10,
         font = native.systemFont,
         fontSize = 20
     })
+    if moodIndicator then
+        moodIndicator:setFillColor(1, 1, 1, 1)
+    end
     
+    -- Store references
+    robotState.sprite = robotBody
+    robotState.personalityIndicator = personalityIndicator
+    robotState.energyBar = energyBar
+    robotState.moodIndicator = moodIndicator
+    
+    -- Start idle animation
     self:startIdleAnimation()
-    return self.sprite
+    
+    return robotBody
+end
+
+-- Play animation
+function AIRobot:playAnimation(animationType)
+    if not animationType or not animations[animationType] then
+        print("Warning: Invalid animation type:", animationType)
+        return false
+    end
+    
+    if robotState.isAnimating then
+        print("Warning: Animation already in progress")
+        return false
+    end
+    
+    local animation = animations[animationType]
+    if not animation then
+        print("Warning: Animation not found:", animationType)
+        return false
+    end
+    
+    robotState.isAnimating = true
+    
+    -- Stop current animation
+    if robotState.sprite then
+        transition.cancel(robotState.sprite)
+    end
+    
+    -- Apply animation based on type
+    if animationType == "idle" then
+        if robotState.sprite then
+            safeTransition(robotState.sprite, {
+                time = animation.duration,
+                alpha = animation.alpha[1],
+                xScale = animation.scale[1],
+                yScale = animation.scale[1],
+                onComplete = function()
+                    robotState.isAnimating = false
+                    -- Continue idle animation
+                    timer.performWithDelay(100, function()
+                        self:playAnimation("idle")
+                    end)
+                end
+            })
+        end
+    elseif animationType == "thinking" then
+        if robotState.sprite then
+            safeTransition(robotState.sprite, {
+                time = animation.duration,
+                rotation = animation.rotation[1],
+                xScale = animation.scale[1],
+                yScale = animation.scale[1],
+                onComplete = function()
+                    robotState.isAnimating = false
+                end
+            })
+        end
+    elseif animationType == "excited" then
+        if robotState.sprite then
+            safeTransition(robotState.sprite, {
+                time = animation.duration,
+                xScale = animation.scale[1],
+                yScale = animation.scale[1],
+                alpha = animation.alpha[1],
+                onComplete = function()
+                    robotState.isAnimating = false
+                end
+            })
+        end
+    elseif animationType == "sad" then
+        if robotState.sprite then
+            safeTransition(robotState.sprite, {
+                time = animation.duration,
+                xScale = animation.scale[1],
+                yScale = animation.scale[1],
+                alpha = animation.alpha[1],
+                onComplete = function()
+                    robotState.isAnimating = false
+                end
+            })
+        end
+    end
+    
+    return true
 end
 
 -- Start idle animation
 function AIRobot:startIdleAnimation()
-    if self.animationTimer then
-        timer.cancel(self.animationTimer)
-    end
-    
-    local anim = animations.idle
-    self.animationTimer = timer.performWithDelay(anim.duration, function()
-        if self.sprite then
-            transition.to(self.sprite, {
-                time = anim.duration/2,
-                xScale = anim.scale[2],
-                yScale = anim.scale[2],
-                onComplete = function()
-                    if self.sprite then
-                        transition.to(self.sprite, {
-                            time = anim.duration/2,
-                            xScale = anim.scale[1],
-                            yScale = anim.scale[1]
-                        })
-                    end
-                end
-            })
-        end
-    end, -1)
-end
-
--- Play animation
-function AIRobot:playAnimation(animationName)
-    if self.animationTimer then
-        timer.cancel(self.animationTimer)
-    end
-    
-    local anim = animations[animationName]
-    if not anim or not self.sprite then return end
-    
-    robotState.currentAnimation = animationName
-    
-    -- Play the animation
-    transition.to(self.sprite, {
-        time = anim.duration/2,
-        xScale = anim.scale[2],
-        yScale = anim.scale[2],
-        alpha = anim.alpha[2],
-        onComplete = function()
-            if self.sprite then
-                transition.to(self.sprite, {
-                    time = anim.duration/2,
-                    xScale = anim.scale[1],
-                    yScale = anim.scale[1],
-                    alpha = anim.alpha[1],
-                    onComplete = function()
-                        if animationName ~= "idle" then
-                            self:startIdleAnimation()
-                        end
-                    end
-                })
-            end
-        end
-    })
-    
-    -- Update personality indicator color based on mood
-    local colors = {
-        neutral = {0.2, 0.8, 0.2, 0.8},
-        excited = {0.8, 0.2, 0.2, 0.8},
-        sad = {0.2, 0.2, 0.8, 0.8},
-        thinking = {0.8, 0.8, 0.2, 0.8}
-    }
-    
-    if colors[animationName] and self.personalityIndicator then
-        self.personalityIndicator:setFillColor(unpack(colors[animationName]))
+    if not robotState.isAnimating then
+        self:playAnimation("idle")
     end
 end
 
 -- Update mood
-function AIRobot:updateMood(sentiment)
-    robotState.mood = sentiment
-    
-    local moodEmojis = {
-        positive = "😊",
-        negative = "😔",
-        neutral = "😐",
-        excited = "🤖",
-        thinking = "🤔"
-    }
-    
-    if self.moodIndicator and moodEmojis[sentiment] then
-        self.moodIndicator.text = moodEmojis[sentiment]
+function AIRobot:updateMood(mood)
+    if not mood then
+        print("Warning: No mood specified")
+        return false
     end
     
-    -- Update energy based on interaction
-    robotState.energy = math.min(100, robotState.energy + 5)
-    self:updateEnergyBar()
+    robotState.currentMood = mood
+    
+    local moodEmojis = {
+        happy = "😊",
+        excited = "🤖",
+        thinking = "🤔",
+        sad = "😔",
+        neutral = "😐"
+    }
+    
+    if robotState.moodIndicator and moodEmojis[mood] then
+        robotState.moodIndicator.text = moodEmojis[mood]
+        return true
+    end
+    
+    return false
 end
 
 -- Update energy bar
-function AIRobot:updateEnergyBar()
-    if self.energyBar then
-        local energyPercent = robotState.energy / 100
-        local energyColors = {
-            {0.2, 0.8, 0.2, 0.8}, -- Green (high energy)
-            {0.8, 0.8, 0.2, 0.8}, -- Yellow (medium energy)
-            {0.8, 0.2, 0.2, 0.8}  -- Red (low energy)
-        }
+function AIRobot:updateEnergyBar(energy)
+    if not energy or type(energy) ~= "number" then
+        print("Warning: Invalid energy value")
+        return false
+    end
+    
+    energy = math.max(0, math.min(100, energy))
+    robotState.energyLevel = energy
+    
+    if robotState.energyBar then
+        local width = (energy / 100) * 90
+        robotState.energyBar.width = width
         
-        local colorIndex = 1
-        if energyPercent < 0.5 then
-            colorIndex = 3
-        elseif energyPercent < 0.8 then
-            colorIndex = 2
+        -- Change color based on energy level
+        if energy > 70 then
+            robotState.energyBar:setFillColor(0.2, 0.8, 0.2, 1) -- Green
+        elseif energy > 30 then
+            robotState.energyBar:setFillColor(1.0, 0.8, 0.2, 1) -- Yellow
+        else
+            robotState.energyBar:setFillColor(0.8, 0.2, 0.2, 1) -- Red
         end
         
-        self.energyBar:setFillColor(unpack(energyColors[colorIndex]))
+        return true
     end
+    
+    return false
 end
 
--- Process input
+-- Process input and determine sentiment
 function AIRobot:processInput(input)
-    if not input then return "neutral" end
+    if not input or type(input) ~= "string" then
+        print("Warning: Invalid input for robot processing")
+        return false
+    end
     
-    -- Analyze sentiment
-    local sentiment = "neutral"
+    -- Simple sentiment analysis
+    local positiveWords = {"good", "great", "awesome", "excellent", "amazing", "love", "like", "happy", "excited"}
+    local negativeWords = {"bad", "terrible", "awful", "hate", "dislike", "sad", "angry", "frustrated"}
+    local questionWords = {"what", "how", "why", "when", "where", "who", "which", "?"}
+    
     local inputLower = string.lower(input)
+    local sentiment = "neutral"
+    local isQuestion = false
     
-    if inputLower:find("great") or inputLower:find("awesome") or inputLower:find("love") then
-        sentiment = "positive"
-    elseif inputLower:find("bad") or inputLower:find("terrible") or inputLower:find("hate") then
-        sentiment = "negative"
-    elseif inputLower:find("think") or inputLower:find("how") or inputLower:find("what") then
+    -- Check for questions
+    for _, word in ipairs(questionWords) do
+        if string.find(inputLower, word) then
+            isQuestion = true
+            break
+        end
+    end
+    
+    -- Check sentiment
+    local positiveCount = 0
+    local negativeCount = 0
+    
+    for _, word in ipairs(positiveWords) do
+        if string.find(inputLower, word) then
+            positiveCount = positiveCount + 1
+        end
+    end
+    
+    for _, word in ipairs(negativeWords) do
+        if string.find(inputLower, word) then
+            negativeCount = negativeCount + 1
+        end
+    end
+    
+    if positiveCount > negativeCount then
+        sentiment = "happy"
+    elseif negativeCount > positiveCount then
+        sentiment = "sad"
+    elseif isQuestion then
         sentiment = "thinking"
     end
     
@@ -243,55 +386,94 @@ function AIRobot:processInput(input)
     self:updateMood(sentiment)
     
     -- Play appropriate animation
-    if sentiment == "positive" then
+    if sentiment == "happy" then
         self:playAnimation("excited")
-    elseif sentiment == "negative" then
+    elseif sentiment == "sad" then
         self:playAnimation("sad")
     elseif sentiment == "thinking" then
         self:playAnimation("thinking")
-    else
-        self:playAnimation("idle")
     end
     
-    -- Update interaction time
-    robotState.lastInteraction = os.time()
+    -- Update energy (simple simulation)
+    local energyChange = 0
+    if sentiment == "happy" then
+        energyChange = 5
+    elseif sentiment == "sad" then
+        energyChange = -3
+    elseif sentiment == "thinking" then
+        energyChange = -1
+    end
+    
+    self:updateEnergyBar(robotState.energyLevel + energyChange)
     
     return sentiment
 end
 
 -- Get personality response
 function AIRobot:getPersonalityResponse(responseType)
-    local responses = personalityResponses[self.personality]
-    return responses[responseType] or "Processing..."
+    if not responseType or not robotState.currentPersonality then
+        return "I'm here to help!"
+    end
+    
+    local personality = personalityResponses[robotState.currentPersonality]
+    if not personality then
+        return "I'm here to help!"
+    end
+    
+    return personality[responseType] or "I'm here to help!"
 end
 
 -- Set personality
 function AIRobot:setPersonality(personality)
-    self.personality = personality
-    robotState.personality = personality
+    if not personality or type(personality) ~= "string" then
+        print("Warning: Invalid personality specified")
+        return false
+    end
     
-    -- Update personality indicator
-    local personalityColors = {
-        helpful = {0.2, 0.8, 0.2, 0.8},
-        friendly = {0.8, 0.2, 0.8, 0.8},
-        professional = {0.2, 0.2, 0.8, 0.8}
+    robotState.currentPersonality = personality
+    
+    if robotState.personalityIndicator then
+        robotState.personalityIndicator.text = personality:sub(1,1):upper() .. personality:sub(2)
+    end
+    
+    return true
+end
+
+-- Cleanup function
+function AIRobot:cleanup()
+    print("Cleaning up AI Robot...")
+    
+    -- Stop animations
+    if robotState.sprite then
+        transition.cancel(robotState.sprite)
+    end
+    
+    -- Remove display objects
+    safeRemove(robotState.sprite)
+    safeRemove(robotState.personalityIndicator)
+    safeRemove(robotState.energyBar)
+    safeRemove(robotState.moodIndicator)
+    
+    -- Reset state
+    robotState = {
+        sprite = nil,
+        personalityIndicator = nil,
+        energyBar = nil,
+        moodIndicator = nil,
+        currentPersonality = "helpful",
+        currentMood = "neutral",
+        energyLevel = 100,
+        isAnimating = false
     }
     
-    if self.personalityIndicator and personalityColors[personality] then
-        self.personalityIndicator:setFillColor(unpack(personalityColors[personality]))
-    end
+    print("AI Robot cleanup completed")
 end
 
--- Get state
-function AIRobot:getState()
-    return robotState
-end
-
--- Cleanup
-function AIRobot:cleanup()
-    if self.animationTimer then
-        timer.cancel(self.animationTimer)
-    end
+-- Constructor
+function AIRobot:new()
+    local robot = {}
+    setmetatable(robot, { __index = AIRobot })
+    return robot
 end
 
 return AIRobot
