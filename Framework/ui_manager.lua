@@ -178,6 +178,8 @@ function UIManager:createChatContainer()
         return false
     end
     
+    debugPrint("Creating chat container for dimensions: " .. self.state.displayWidth .. " x " .. self.state.displayHeight)
+    
     -- Create the main chat container as a display group
     self.state.chatContainer = display.newGroup()
     if not self.state.chatContainer then
@@ -185,13 +187,13 @@ function UIManager:createChatContainer()
         return false
     end
     
-    -- Position the chat container in the center of the screen
+    -- Position the chat container properly for 320x360 screen
     self.state.chatContainer.x = self.state.displayWidth / 2
-    self.state.chatContainer.y = self.state.displayHeight / 2 - 50
-    self.state.chatContainer.width = self.state.displayWidth - 40
-    self.state.chatContainer.height = self.state.displayHeight - 250
+    self.state.chatContainer.y = self.state.displayHeight / 2 - 30  -- Moved up slightly
+    self.state.chatContainer.width = self.state.displayWidth - 20   -- Smaller width
+    self.state.chatContainer.height = self.state.displayHeight - 200 -- Smaller height
     
-    debugPrint("Chat container created at position: " .. self.state.chatContainer.x .. ", " .. self.state.chatContainer.y)
+    debugPrint("Chat container positioned at: " .. self.state.chatContainer.x .. ", " .. self.state.chatContainer.y)
     debugPrint("Chat container size: " .. self.state.chatContainer.width .. " x " .. self.state.chatContainer.height)
     
     -- Create a visible background for the chat area
@@ -211,8 +213,8 @@ function UIManager:createChatContainer()
         -- Position messages group relative to chat container
         self.state.chatContainer.messagesGroup.x = 0
         self.state.chatContainer.messagesGroup.y = 0
-        self.state.chatContainer.messagesGroup.width = self.state.chatContainer.width - 20
-        self.state.chatContainer.messagesGroup.height = self.state.chatContainer.height - 20
+        self.state.chatContainer.messagesGroup.width = self.state.chatContainer.width - 10
+        self.state.chatContainer.messagesGroup.height = self.state.chatContainer.height - 10
         
         -- Insert messages group into chat container
         self.state.chatContainer:insert(self.state.chatContainer.messagesGroup)
@@ -248,9 +250,11 @@ function UIManager:createInputArea()
         return false
     end
     
-    -- Input background
+    debugPrint("Creating input area for dimensions: " .. self.state.displayWidth .. " x " .. self.state.displayHeight)
+    
+    -- Input background - positioned at bottom for 320x360 screen
     ---@type DisplayObject
-    local inputBg = display.newRoundedRect(self.state.displayWidth/2, self.state.displayHeight - 80, self.state.displayWidth - 120, 50, 25)
+    local inputBg = display.newRoundedRect(self.state.displayWidth/2, self.state.displayHeight - 40, self.state.displayWidth - 20, 30, 15)
     if inputBg then
         inputBg:setFillColor(0.9, 0.9, 0.9, 0.8)
         inputBg:setStrokeColor(0.7, 0.7, 0.7, 1)
@@ -259,10 +263,10 @@ function UIManager:createInputArea()
     
     -- Create proper text input field for Solar2D simulator
     local success, result = pcall(function()
-        self.state.inputField = native.newTextField(self.state.displayWidth/2, self.state.displayHeight - 80, self.state.displayWidth - 160, 40)
+        self.state.inputField = native.newTextField(self.state.displayWidth/2, self.state.displayHeight - 40, self.state.displayWidth - 60, 25)
         if self.state.inputField then
             self.state.inputField.placeholder = "Type your message here..."
-            self.state.inputField.font = native.newFont(native.systemFont, 16)
+            self.state.inputField.font = native.newFont(native.systemFont, 12)
             self.state.inputField:addEventListener("userInput", function(event)
                 if event.phase == "submitted" then
                     self:handleSend()
@@ -278,9 +282,9 @@ function UIManager:createInputArea()
         self.state.inputField = display.newText({
             text = "Click to type message",
             x = self.state.displayWidth/2,
-            y = self.state.displayHeight - 80,
+            y = self.state.displayHeight - 40,
             font = native.systemFont,
-            fontSize = 16
+            fontSize = 12
         })
         if self.state.inputField then
             self.state.inputField:setFillColor(0.5, 0.5, 0.5, 1)
@@ -294,8 +298,8 @@ function UIManager:createInputArea()
         end
     end
     
-    -- Send button
-    self.state.sendButton = display.newRoundedRect(self.state.displayWidth - 60, self.state.displayHeight - 80, 50, 40, 20)
+    -- Send button - smaller and positioned properly
+    self.state.sendButton = display.newRoundedRect(self.state.displayWidth - 30, self.state.displayHeight - 40, 40, 25, 12)
     if self.state.sendButton then
         self.state.sendButton:setFillColor(0.2, 0.6, 1.0, 0.9)
         self.state.sendButton:setStrokeColor(0.1, 0.4, 0.8, 1)
@@ -307,7 +311,7 @@ function UIManager:createInputArea()
             x = self.state.sendButton.x,
             y = self.state.sendButton.y,
             font = native.systemFont,
-            fontSize = 14
+            fontSize = 10
         })
         if sendText then
             sendText:setFillColor(1, 1, 1, 1)
@@ -331,10 +335,10 @@ function UIManager:createStatusBar()
     
     self.state.statusLabel = display.newText({
         text = "AI Assistant Ready",
-        x = 20,
-        y = 40,
+        x = 10,
+        y = 25,
         font = native.systemFont,
-        fontSize = 14,
+        fontSize = 10,
         align = "left"
     })
     if self.state.statusLabel then
@@ -355,10 +359,10 @@ function UIManager:createMemoryDisplay()
     
     self.state.memoryLabel = display.newText({
         text = "Memory: 0 conversations",
-        x = self.state.displayWidth - 20,
-        y = 40,
+        x = self.state.displayWidth - 10,
+        y = 25,
         font = native.systemFont,
-        fontSize = 12,
+        fontSize = 8,
         align = "right"
     })
     if self.state.memoryLabel then
@@ -366,8 +370,8 @@ function UIManager:createMemoryDisplay()
         self.state.memoryLabel.anchorX = 1
     end
     
-    -- Clear memory button
-    self.state.clearButton = display.newRoundedRect(self.state.displayWidth - 100, 60, 80, 25, 12)
+    -- Clear memory button - smaller and positioned properly
+    self.state.clearButton = display.newRoundedRect(self.state.displayWidth - 60, 45, 50, 20, 10)
     if self.state.clearButton then
         self.state.clearButton:setFillColor(0.8, 0.3, 0.3, 0.8)
         
@@ -377,7 +381,7 @@ function UIManager:createMemoryDisplay()
             x = self.state.clearButton.x,
             y = self.state.clearButton.y,
             font = native.systemFont,
-            fontSize = 12
+            fontSize = 8
         })
         if clearText then
             clearText:setFillColor(1, 1, 1, 1)
@@ -657,13 +661,13 @@ function UIManager:addChatBubble(text, isUser)
             backgroundColor = {0.2, 0.6, 1.0, 1.0},  -- More opaque blue
             textColor = {1, 1, 1, 1},
             cornerRadius = 15,
-            maxWidth = 250
+            maxWidth = 120  -- Smaller width for 320x360 screen
         },
         aiBubble = {
             backgroundColor = {0.9, 0.9, 0.9, 1.0},  -- More opaque gray
             textColor = {0.2, 0.2, 0.2, 1},
             cornerRadius = 15,
-            maxWidth = 250
+            maxWidth = 120  -- Smaller width for 320x360 screen
         }
     }
     
@@ -671,7 +675,7 @@ function UIManager:addChatBubble(text, isUser)
     
     -- Create bubble background with more visible styling
     ---@type DisplayObject
-    local bubble = display.newRoundedRect(0, 0, style.maxWidth, 60, style.cornerRadius)
+    local bubble = display.newRoundedRect(0, 0, style.maxWidth, 50, style.cornerRadius)  -- Smaller height
     if not bubble then
         print("Error: Failed to create bubble background")
         return
@@ -687,9 +691,9 @@ function UIManager:addChatBubble(text, isUser)
         text = text,
         x = 0,
         y = 0,
-        width = style.maxWidth - 20,
+        width = style.maxWidth - 10,  -- Smaller text width
         font = native.systemFont,
-        fontSize = 14,
+        fontSize = 12,  -- Smaller font size
         align = "left"
     })
     if not textObj then
@@ -711,15 +715,22 @@ function UIManager:addChatBubble(text, isUser)
         local bubbleX, bubbleY
         
         if isUser then
-            -- User bubbles on the right
-            bubbleX = self.state.chatContainer.messagesGroup.width - bubble.width/2 - 20
+            -- User bubbles on the right side
+            bubbleX = self.state.chatContainer.messagesGroup.width - bubble.width/2 - 10
         else
-            -- AI bubbles on the left
-            bubbleX = bubble.width/2 + 20
+            -- AI bubbles on the left side
+            bubbleX = bubble.width/2 + 10
         end
         
         -- Position vertically with proper spacing
-        bubbleY = (self.state.chatContainer.currentY or 10) + 30
+        bubbleY = (self.state.chatContainer.currentY or 10) + 25  -- Smaller spacing
+        
+        -- Ensure bubble stays within bounds
+        if bubbleX < bubble.width/2 then
+            bubbleX = bubble.width/2 + 5
+        elseif bubbleX > self.state.chatContainer.messagesGroup.width - bubble.width/2 then
+            bubbleX = self.state.chatContainer.messagesGroup.width - bubble.width/2 - 5
+        end
         
         -- Set bubble position
         bubbleGroup.x = bubbleX
@@ -727,6 +738,7 @@ function UIManager:addChatBubble(text, isUser)
         
         debugPrint("Bubble positioned at: " .. bubbleX .. ", " .. bubbleY)
         debugPrint("Messages group size: " .. self.state.chatContainer.messagesGroup.width .. " x " .. self.state.chatContainer.messagesGroup.height)
+        debugPrint("Bubble size: " .. bubble.width .. " x " .. bubble.height)
         
         -- Add to messages group
         self.state.chatContainer.messagesGroup:insert(bubbleGroup)
@@ -734,18 +746,18 @@ function UIManager:addChatBubble(text, isUser)
         debugPrint("Messages group children after: " .. self.state.chatContainer.messagesGroup.numChildren)
         
         -- Update current Y position for next bubble
-        self.state.chatContainer.currentY = bubbleY + 50
+        self.state.chatContainer.currentY = bubbleY + 40  -- Smaller spacing
         
         -- Simple auto-scroll if we're running out of space
-        if self.state.chatContainer.currentY > (self.state.chatContainer.maxY or 400) then
+        if self.state.chatContainer.currentY > (self.state.chatContainer.maxY or 300) then
             debugPrint("Auto-scrolling messages...")
             for i = 1, self.state.chatContainer.messagesGroup.numChildren do
                 local child = self.state.chatContainer.messagesGroup[i]
                 if child and child.y then
-                    child.y = child.y - 80
+                    child.y = child.y - 60  -- Smaller scroll amount
                 end
             end
-            self.state.chatContainer.currentY = self.state.chatContainer.currentY - 80
+            self.state.chatContainer.currentY = self.state.chatContainer.currentY - 60
         end
         
         return bubbleGroup
