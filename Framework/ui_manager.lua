@@ -1,5 +1,26 @@
 local UIManager = {}
 
+-- Require widget library with fallback
+local widget
+local success, err = pcall(function()
+    widget = require("widget")
+end)
+if not success then
+    print("Warning: Widget library not available, using fallback UI")
+    widget = {}
+end
+
+-- Check for native library
+if not native then
+    print("Warning: Native library not available, using fallback")
+    native = {
+        newTextField = function() return {} end,
+        newFont = function() return "system" end,
+        systemFont = "system",
+        systemFontBold = "system"
+    }
+end
+
 -- UI Elements
 local chatContainer
 local inputField
@@ -38,17 +59,26 @@ function UIManager:createChatContainer()
     chatContainer.width = _w - 40
     chatContainer.height = _h - 200
     
-    -- Add scroll view for chat messages
-    local scrollView = widget.newScrollView({
-        top = chatContainer.y - chatContainer.height/2,
-        left = chatContainer.x - chatContainer.width/2,
-        width = chatContainer.width,
-        height = chatContainer.height,
-        scrollWidth = chatContainer.width,
-        scrollHeight = chatContainer.height,
-        backgroundColor = {0.95, 0.95, 0.95, 0.3}
-    })
-    chatContainer.scrollView = scrollView
+    -- Create a simple chat area without scroll view for better compatibility
+    local chatBackground = display.newRoundedRect(chatContainer.x, chatContainer.y, chatContainer.width, chatContainer.height, 10)
+    chatBackground:setFillColor(0.95, 0.95, 0.95, 0.3)
+    chatBackground:setStrokeColor(0.8, 0.8, 0.8, 0.5)
+    chatBackground.strokeWidth = 1
+    
+    -- Create a simple group for chat messages
+    chatContainer.messagesGroup = display.newGroup()
+    chatContainer.messagesGroup.x = chatContainer.x
+    chatContainer.messagesGroup.y = chatContainer.y
+    chatContainer.messagesGroup.width = chatContainer.width - 20
+    chatContainer.messagesGroup.height = chatContainer.height - 20
+    
+    -- Add the messages group to the chat container
+    chatContainer:insert(chatBackground)
+    chatContainer:insert(chatContainer.messagesGroup)
+    
+    -- Initialize message position tracking
+    chatContainer.currentY = 10
+    chatContainer.maxY = chatContainer.height - 20
 end
 
 function UIManager:createInputArea()
@@ -59,10 +89,34 @@ function UIManager:createInputArea()
     inputBg.strokeWidth = 2
     
     -- Text input field
-    inputField = native.newTextField(_w/2, _h - 80, _w - 160, 40)
-    inputField.placeholder = "Type your message here..."
-    inputField.font = native.newFont(native.systemFont, 16)
-    inputField:addEventListener("userInput", self.handleInput)
+    local success, result = pcall(function()
+        inputField = native.newTextField(_w/2, _h - 80, _w - 160, 40)
+        inputField.placeholder = "Type your message here..."
+        inputField.font = native.newFont(native.systemFont, 16)
+        inputField:addEventListener("userInput", self.handleInput)
+        return inputField
+    end)
+    
+    if not success then
+        print("Warning: Text field not available, using fallback")
+        -- Create a simple text display as fallback
+        inputField = display.newText({
+            text = "Tap to type...",
+            x = _w/2,
+            y = _h - 80,
+            font = native.systemFont,
+            fontSize = 16
+        })
+        inputField:setFillColor(0.5, 0.5, 0.5, 1)
+        inputField.text = ""
+        inputField.placeholder = "Type your message here..."
+        
+        -- Add tap handler for manual input
+        inputField:addEventListener("tap", function()
+            -- For now, just send a test message
+            self:handleSend()
+        end)
+    end
     
     -- Send button
     sendButton = display.newRoundedRect(_w - 60, _h - 80, 50, 40, 20)
@@ -156,16 +210,26 @@ function UIManager:addChatBubble(text, isUser)
         bubbleGroup.x = bubble.width/2 + 20
     end
     
-    -- Add to scroll view
-    chatContainer.scrollView:insert(bubbleGroup)
+    -- Position vertically
+    bubbleGroup.y = chatContainer.currentY + 30
     
-    -- Scroll to bottom
-    timer.performWithDelay(100, function()
-        chatContainer.scrollView:scrollToPosition({
-            y = chatContainer.scrollView.contentHeight,
-            time = 300
-        })
-    end)
+    -- Add to messages group
+    chatContainer.messagesGroup:insert(bubbleGroup)
+    
+    -- Update current Y position
+    chatContainer.currentY = chatContainer.currentY + 80
+    
+    -- Simple auto-scroll: if we exceed the height, move all messages up
+    if chatContainer.currentY > chatContainer.maxY then
+        -- Move all messages up by 80 pixels
+        for i = 1, chatContainer.messagesGroup.numChildren do
+            local child = chatContainer.messagesGroup[i]
+            if child.y then
+                child.y = child.y - 80
+            end
+        end
+        chatContainer.currentY = chatContainer.currentY - 80
+    end
     
     return bubbleGroup
 end
@@ -185,13 +249,33 @@ function UIManager:handleInput(event)
 end
 
 function UIManager:handleSend()
-    local text = inputField.text
+    local text = inputField.text or ""
+    
+    -- Demo mode: if no text input available, use demo messages
+    if not text or text == "" or text == "Tap to type..." then
+        -- Demo conversation
+        local demoMessages = {
+            "Hello! How are you today?",
+            "What is artificial intelligence?",
+            "Tell me about programming",
+            "How does the internet work?",
+            "What is the weather like?"
+        }
+        
+        local demoIndex = (self.demoCounter or 0) % #demoMessages + 1
+        text = demoMessages[demoIndex]
+        self.demoCounter = (self.demoCounter or 0) + 1
+    end
+    
     if text and text ~= "" then
         -- Add user message to chat
         self:addChatBubble(text, true)
         
         -- Clear input field
         inputField.text = ""
+        if inputField.setText then
+            inputField:setText("")
+        end
         
         -- Update status to show processing
         self:updateStatus("AI Assistant - Processing...")
@@ -224,8 +308,14 @@ function UIManager:handleClearMemory()
     LLMCore:clearMemory()
     
     -- Clear chat display
-    chatContainer.scrollView:removeSelf()
-    self:createChatContainer()
+    if chatContainer and chatContainer.messagesGroup then
+        chatContainer.messagesGroup:removeSelf()
+        chatContainer.messagesGroup = display.newGroup()
+        chatContainer.messagesGroup.x = chatContainer.x
+        chatContainer.messagesGroup.y = chatContainer.y
+        chatContainer:insert(chatContainer.messagesGroup)
+        chatContainer.currentY = 10
+    end
     
     -- Update displays
     self:updateStatus("Memory cleared - AI Assistant Ready")
