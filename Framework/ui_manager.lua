@@ -1,35 +1,49 @@
 -- UI Manager for Caleb's AI Assistant
 -- Expert-level Solar2D implementation with comprehensive error handling
 
+-- ============================================================================
+-- MODULE DEFINITION & INSTANCE MANAGEMENT
+-- ============================================================================
+
 local UIManager = {}
 
--- UI Elements
-local chatContainer
-local inputField
-local sendButton
-local statusLabel
-local memoryLabel
-local clearButton
+-- ============================================================================
+-- INSTANCE STATE MANAGEMENT
+-- ============================================================================
 
--- Dialog state management
-local activeDialog = nil
-local dialogElements = {}
-
--- Chat bubble styling
-local bubbleStyle = {
-    userBubble = {
-        backgroundColor = {0.2, 0.6, 1.0, 0.9},
-        textColor = {1, 1, 1, 1},
-        cornerRadius = 15,
-        maxWidth = 250
-    },
-    aiBubble = {
-        backgroundColor = {0.9, 0.9, 0.9, 0.9},
-        textColor = {0.2, 0.2, 0.2, 1},
-        cornerRadius = 15,
-        maxWidth = 250
+-- Instance-specific state (not module globals)
+local function createInstanceState()
+    return {
+        -- UI Elements (instance-specific)
+        chatContainer = nil,
+        inputField = nil,
+        sendButton = nil,
+        statusLabel = nil,
+        memoryLabel = nil,
+        clearButton = nil,
+        
+        -- Dialog state management (instance-specific)
+        activeDialog = nil,
+        dialogElements = {},
+        
+        -- Module dependencies (injected from main)
+        aiRobot = nil,
+        llmCore = nil,
+        knowledgeBase = nil,
+        
+        -- Instance state
+        isInitialized = false,
+        demoCounter = 0,
+        
+        -- Display dimensions (instance-specific)
+        displayWidth = display.actualContentWidth,
+        displayHeight = display.actualContentHeight
     }
-}
+end
+
+-- ============================================================================
+-- SAFETY & UTILITY FUNCTIONS (INSTANCE-AGNOSTIC)
+-- ============================================================================
 
 -- Safe element removal function
 local function safeRemove(element)
@@ -40,17 +54,6 @@ local function safeRemove(element)
         if not success then
             print("Warning: Failed to remove element:", err)
         end
-    end
-end
-
--- Safe cleanup dialog elements
-local function cleanupDialog()
-    if activeDialog then
-        for _, element in ipairs(dialogElements) do
-            safeRemove(element)
-        end
-        dialogElements = {}
-        activeDialog = nil
     end
 end
 
@@ -70,94 +73,354 @@ local function validateInput(text)
     return true, sanitized
 end
 
+-- ============================================================================
+-- INSTANCE METHODS (PROPER SCOPE)
+-- ============================================================================
+
+-- Constructor with proper instance isolation
+function UIManager:new()
+    local instance = {}
+    setmetatable(instance, { __index = UIManager })
+    
+    -- Initialize instance state
+    instance.state = createInstanceState()
+    
+    return instance
+end
+
+-- Initialize the UI with proper scope
+function UIManager:init()
+    if self.state.isInitialized then
+        print("Warning: UI Manager already initialized")
+        return true
+    end
+    
+    print("Initializing UI Manager...")
+    
+    -- Validate display dimensions
+    if not self.state.displayWidth or not self.state.displayHeight then
+        print("Error: Invalid display dimensions")
+        return false
+    end
+    
+    -- Create UI components in dependency order
+    if not self:createChatContainer() then
+        print("Error: Failed to create chat container")
+        return false
+    end
+    
+    if not self:createInputArea() then
+        print("Error: Failed to create input area")
+        return false
+    end
+    
+    if not self:createStatusBar() then
+        print("Error: Failed to create status bar")
+        return false
+    end
+    
+    if not self:createMemoryDisplay() then
+        print("Error: Failed to create memory display")
+        return false
+    end
+    
+    self.state.isInitialized = true
+    print("✓ UI Manager initialized successfully!")
+    return true
+end
+
+-- Create chat container with instance scope
+function UIManager:createChatContainer()
+    if not self.state.displayWidth or not self.state.displayHeight then
+        print("Error: Invalid dimensions for chat container")
+        return false
+    end
+    
+    self.state.chatContainer = display.newGroup()
+    if not self.state.chatContainer then
+        print("Error: Failed to create chat container")
+        return false
+    end
+    
+    self.state.chatContainer.x = self.state.displayWidth/2
+    self.state.chatContainer.y = self.state.displayHeight/2 - 100
+    self.state.chatContainer.width = self.state.displayWidth - 40
+    self.state.chatContainer.height = self.state.displayHeight - 200
+    
+    -- Create chat background
+    local chatBackground = display.newRoundedRect(self.state.chatContainer.x, self.state.chatContainer.y, self.state.chatContainer.width, self.state.chatContainer.height, 10)
+    if chatBackground then
+        chatBackground:setFillColor(0.95, 0.95, 0.95, 0.3)
+        chatBackground:setStrokeColor(0.8, 0.8, 0.8, 0.5)
+        chatBackground.strokeWidth = 1
+        self.state.chatContainer:insert(chatBackground)
+    end
+    
+    -- Create messages group
+    self.state.chatContainer.messagesGroup = display.newGroup()
+    if self.state.chatContainer.messagesGroup then
+        self.state.chatContainer.messagesGroup.x = self.state.chatContainer.x
+        self.state.chatContainer.messagesGroup.y = self.state.chatContainer.y
+        self.state.chatContainer.messagesGroup.width = self.state.chatContainer.width - 20
+        self.state.chatContainer.messagesGroup.height = self.state.chatContainer.height - 20
+        self.state.chatContainer:insert(self.state.chatContainer.messagesGroup)
+    end
+    
+    -- Initialize message tracking
+    self.state.chatContainer.currentY = 10
+    self.state.chatContainer.maxY = self.state.chatContainer.height - 20
+    
+    return true
+end
+
+-- Create input area with instance scope
+function UIManager:createInputArea()
+    if not self.state.displayWidth or not self.state.displayHeight then
+        print("Error: Invalid dimensions for input area")
+        return false
+    end
+    
+    -- Input background
+    local inputBg = display.newRoundedRect(self.state.displayWidth/2, self.state.displayHeight - 80, self.state.displayWidth - 120, 50, 25)
+    if inputBg then
+        inputBg:setFillColor(0.9, 0.9, 0.9, 0.8)
+        inputBg:setStrokeColor(0.7, 0.7, 0.7, 1)
+        inputBg.strokeWidth = 2
+    end
+    
+    -- Create proper text input field for Solar2D simulator
+    local success, result = pcall(function()
+        self.state.inputField = native.newTextField(self.state.displayWidth/2, self.state.displayHeight - 80, self.state.displayWidth - 160, 40)
+        if self.state.inputField then
+            self.state.inputField.placeholder = "Type your message here..."
+            self.state.inputField.font = native.newFont(native.systemFont, 16)
+            self.state.inputField:addEventListener("userInput", function(event)
+                if event.phase == "submitted" then
+                    self:handleSend()
+                end
+            end)
+        end
+        return self.state.inputField
+    end)
+    
+    if not success or not self.state.inputField then
+        print("Warning: Native text field not available, using fallback")
+        -- Create a clickable text input simulation
+        self.state.inputField = display.newText({
+            text = "Click to type message",
+            x = self.state.displayWidth/2,
+            y = self.state.displayHeight - 80,
+            font = native.systemFont,
+            fontSize = 16
+        })
+        if self.state.inputField then
+            self.state.inputField:setFillColor(0.5, 0.5, 0.5, 1)
+            self.state.inputField.text = ""
+            self.state.inputField.isSimulated = true
+            
+            -- Add tap handler for simulated input
+            self.state.inputField:addEventListener("tap", function()
+                self:showTextInputDialog()
+            end)
+        end
+    end
+    
+    -- Send button
+    self.state.sendButton = display.newRoundedRect(self.state.displayWidth - 60, self.state.displayHeight - 80, 50, 40, 20)
+    if self.state.sendButton then
+        self.state.sendButton:setFillColor(0.2, 0.6, 1.0, 0.9)
+        self.state.sendButton:setStrokeColor(0.1, 0.4, 0.8, 1)
+        self.state.sendButton.strokeWidth = 2
+        
+        local sendText = display.newText({
+            text = "Send",
+            x = self.state.sendButton.x,
+            y = self.state.sendButton.y,
+            font = native.systemFont,
+            fontSize = 14
+        })
+        if sendText then
+            sendText:setFillColor(1, 1, 1, 1)
+        end
+        
+        self.state.sendButton:addEventListener("tap", function()
+            self:handleSend()
+        end)
+    end
+    
+    return true
+end
+
+-- Create status bar with instance scope
+function UIManager:createStatusBar()
+    if not self.state.displayWidth or not self.state.displayHeight then
+        print("Error: Invalid dimensions for status bar")
+        return false
+    end
+    
+    self.state.statusLabel = display.newText({
+        text = "AI Assistant Ready",
+        x = 20,
+        y = 40,
+        font = native.systemFont,
+        fontSize = 14,
+        align = "left"
+    })
+    if self.state.statusLabel then
+        self.state.statusLabel:setFillColor(0.3, 0.3, 0.3, 1)
+        self.state.statusLabel.anchorX = 0
+    end
+    
+    return true
+end
+
+-- Create memory display with instance scope
+function UIManager:createMemoryDisplay()
+    if not self.state.displayWidth or not self.state.displayHeight then
+        print("Error: Invalid dimensions for memory display")
+        return false
+    end
+    
+    self.state.memoryLabel = display.newText({
+        text = "Memory: 0 conversations",
+        x = self.state.displayWidth - 20,
+        y = 40,
+        font = native.systemFont,
+        fontSize = 12,
+        align = "right"
+    })
+    if self.state.memoryLabel then
+        self.state.memoryLabel:setFillColor(0.5, 0.5, 0.5, 1)
+        self.state.memoryLabel.anchorX = 1
+    end
+    
+    -- Clear memory button
+    self.state.clearButton = display.newRoundedRect(self.state.displayWidth - 100, 60, 80, 25, 12)
+    if self.state.clearButton then
+        self.state.clearButton:setFillColor(0.8, 0.3, 0.3, 0.8)
+        
+        local clearText = display.newText({
+            text = "Clear",
+            x = self.state.clearButton.x,
+            y = self.state.clearButton.y,
+            font = native.systemFont,
+            fontSize = 12
+        })
+        if clearText then
+            clearText:setFillColor(1, 1, 1, 1)
+        end
+        
+        self.state.clearButton:addEventListener("tap", function()
+            self:handleClearMemory()
+        end)
+    end
+    
+    return true
+end
+
+-- ============================================================================
+-- DIALOG MANAGEMENT (INSTANCE-SCOPED)
+-- ============================================================================
+
+-- Safe cleanup dialog elements
+function UIManager:cleanupDialog()
+    if self.state.activeDialog then
+        for _, element in ipairs(self.state.dialogElements) do
+            safeRemove(element)
+        end
+        self.state.dialogElements = {}
+        self.state.activeDialog = nil
+    end
+end
+
 -- Show text input dialog for simulator
 function UIManager:showTextInputDialog()
     -- Prevent multiple dialogs
-    if activeDialog then
+    if self.state.activeDialog then
         print("Warning: Dialog already active")
         return
     end
     
-    activeDialog = true
-    dialogElements = {}
+    self.state.activeDialog = true
+    self.state.dialogElements = {}
     
     -- Create dialog background
-    local dialogBg = display.newRoundedRect(display.actualContentWidth/2, display.actualContentHeight/2, 300, 150, 20)
+    local dialogBg = display.newRoundedRect(self.state.displayWidth/2, self.state.displayHeight/2, 300, 150, 20)
     if dialogBg then
         dialogBg:setFillColor(1, 1, 1, 0.95)
         dialogBg:setStrokeColor(0.7, 0.7, 0.7, 1)
         dialogBg.strokeWidth = 2
-        table.insert(dialogElements, dialogBg)
+        table.insert(self.state.dialogElements, dialogBg)
     end
     
     -- Create title
     local title = display.newText({
         text = "Enter your message:",
-        x = display.actualContentWidth/2,
-        y = display.actualContentHeight/2 - 40,
+        x = self.state.displayWidth/2,
+        y = self.state.displayHeight/2 - 40,
         font = native.systemFont,
         fontSize = 16
     })
     if title then
         title:setFillColor(0.2, 0.2, 0.2, 1)
-        table.insert(dialogElements, title)
+        table.insert(self.state.dialogElements, title)
     end
     
     -- Create input field for dialog
     local dialogInput = nil
     local success, result = pcall(function()
-        dialogInput = native.newTextField(display.actualContentWidth/2, display.actualContentHeight/2, 250, 30)
+        dialogInput = native.newTextField(self.state.displayWidth/2, self.state.displayHeight/2, 250, 30)
         if dialogInput then
             dialogInput.placeholder = "Type here..."
             dialogInput.font = native.newFont(native.systemFont, 14)
             dialogInput:setTextColor(0, 0, 0, 1)
-            table.insert(dialogElements, dialogInput)
+            table.insert(self.state.dialogElements, dialogInput)
         end
         return dialogInput
     end)
     
     if not success or not dialogInput then
         print("Warning: Failed to create dialog input field")
-        cleanupDialog()
+        self:cleanupDialog()
         return
     end
     
     -- Create send button
-    local sendBtn = display.newRoundedRect(display.actualContentWidth/2 + 80, display.actualContentHeight/2 + 30, 60, 30, 15)
+    local sendBtn = display.newRoundedRect(self.state.displayWidth/2 + 80, self.state.displayHeight/2 + 30, 60, 30, 15)
     if sendBtn then
         sendBtn:setFillColor(0.2, 0.6, 1.0, 0.9)
-        table.insert(dialogElements, sendBtn)
+        table.insert(self.state.dialogElements, sendBtn)
     end
     
     local sendText = display.newText({
         text = "Send",
-        x = sendBtn and sendBtn.x or display.actualContentWidth/2 + 80,
-        y = sendBtn and sendBtn.y or display.actualContentHeight/2 + 30,
+        x = sendBtn and sendBtn.x or self.state.displayWidth/2 + 80,
+        y = sendBtn and sendBtn.y or self.state.displayHeight/2 + 30,
         font = native.systemFont,
         fontSize = 12
     })
     if sendText then
         sendText:setFillColor(1, 1, 1, 1)
-        table.insert(dialogElements, sendText)
+        table.insert(self.state.dialogElements, sendText)
     end
     
     -- Create cancel button
-    local cancelBtn = display.newRoundedRect(display.actualContentWidth/2 - 80, display.actualContentHeight/2 + 30, 60, 30, 15)
+    local cancelBtn = display.newRoundedRect(self.state.displayWidth/2 - 80, self.state.displayHeight/2 + 30, 60, 30, 15)
     if cancelBtn then
         cancelBtn:setFillColor(0.7, 0.7, 0.7, 0.9)
-        table.insert(dialogElements, cancelBtn)
+        table.insert(self.state.dialogElements, cancelBtn)
     end
     
     local cancelText = display.newText({
         text = "Cancel",
-        x = cancelBtn and cancelBtn.x or display.actualContentWidth/2 - 80,
-        y = cancelBtn and cancelBtn.y or display.actualContentHeight/2 + 30,
+        x = cancelBtn and cancelBtn.x or self.state.displayWidth/2 - 80,
+        y = cancelBtn and cancelBtn.y or self.state.displayHeight/2 + 30,
         font = native.systemFont,
         fontSize = 12
     })
     if cancelText then
         cancelText:setFillColor(1, 1, 1, 1)
-        table.insert(dialogElements, cancelText)
+        table.insert(self.state.dialogElements, cancelText)
     end
     
     -- Handle send button
@@ -173,17 +436,21 @@ function UIManager:showTextInputDialog()
                     print("Input validation failed:", sanitizedText)
                 end
             end
-            cleanupDialog()
+            self:cleanupDialog()
         end)
     end
     
     -- Handle cancel button
     if cancelBtn then
         cancelBtn:addEventListener("tap", function()
-            cleanupDialog()
+            self:cleanupDialog()
         end)
     end
 end
+
+-- ============================================================================
+-- CORE FUNCTIONALITY (INSTANCE-SCOPED)
+-- ============================================================================
 
 -- Process user input with validation
 function UIManager:processUserInput(text)
@@ -199,13 +466,12 @@ function UIManager:processUserInput(text)
     -- Update status
     self:updateStatus("AI Assistant - Processing...")
     
-    -- Process with LLM
-    local success, LLMCore = pcall(require, "Definitions.llm_core")
-    if success then
+    -- Process with LLM (using injected dependencies)
+    if self.state.llmCore then
         -- Process input with AI robot for visual feedback
-        if self.aiRobot and self.aiRobot.processInput then
+        if self.state.aiRobot and self.state.aiRobot.processInput then
             local robotSuccess, robotErr = pcall(function()
-                self.aiRobot:processInput(sanitizedText)
+                self.state.aiRobot:processInput(sanitizedText)
             end)
             if not robotSuccess then
                 print("Warning: Robot processing failed:", robotErr)
@@ -214,7 +480,7 @@ function UIManager:processUserInput(text)
         
         -- Generate response
         local responseSuccess, response = pcall(function()
-            return LLMCore:processInput(sanitizedText)
+            return self.state.llmCore:processInput(sanitizedText)
         end)
         
         if responseSuccess and response then
@@ -223,7 +489,7 @@ function UIManager:processUserInput(text)
             
             -- Update memory stats
             local statsSuccess, stats = pcall(function()
-                return LLMCore:getMemoryStats()
+                return self.state.llmCore:getMemoryStats()
             end)
             
             if statsSuccess and stats then
@@ -251,227 +517,32 @@ function UIManager:processUserInput(text)
     end
 end
 
--- Initialize UI Manager
-function UIManager:new()
-    local ui = {}
-    setmetatable(ui, { __index = UIManager })
-    return ui
-end
-
--- Initialize the UI
-function UIManager:init()
-    print("Initializing UI Manager...")
-    
-    -- Get display dimensions
-    local _w = display.actualContentWidth
-    local _h = display.actualContentHeight
-    
-    if not _w or not _h then
-        print("Error: Invalid display dimensions")
-        return false
-    end
-    
-    self:createChatContainer(_w, _h)
-    self:createInputArea(_w, _h)
-    self:createStatusBar(_w, _h)
-    self:createMemoryDisplay(_w, _h)
-    
-    print("UI Manager initialized successfully!")
-    return true
-end
-
--- Create chat container
-function UIManager:createChatContainer(_w, _h)
-    if not _w or not _h then
-        print("Error: Invalid dimensions for chat container")
-        return
-    end
-    
-    chatContainer = display.newGroup()
-    if not chatContainer then
-        print("Error: Failed to create chat container")
-        return
-    end
-    
-    chatContainer.x = _w/2
-    chatContainer.y = _h/2 - 100
-    chatContainer.width = _w - 40
-    chatContainer.height = _h - 200
-    
-    -- Create chat background
-    local chatBackground = display.newRoundedRect(chatContainer.x, chatContainer.y, chatContainer.width, chatContainer.height, 10)
-    if chatBackground then
-        chatBackground:setFillColor(0.95, 0.95, 0.95, 0.3)
-        chatBackground:setStrokeColor(0.8, 0.8, 0.8, 0.5)
-        chatBackground.strokeWidth = 1
-        chatContainer:insert(chatBackground)
-    end
-    
-    -- Create messages group
-    chatContainer.messagesGroup = display.newGroup()
-    if chatContainer.messagesGroup then
-        chatContainer.messagesGroup.x = chatContainer.x
-        chatContainer.messagesGroup.y = chatContainer.y
-        chatContainer.messagesGroup.width = chatContainer.width - 20
-        chatContainer.messagesGroup.height = chatContainer.height - 20
-        chatContainer:insert(chatContainer.messagesGroup)
-    end
-    
-    -- Initialize message tracking
-    chatContainer.currentY = 10
-    chatContainer.maxY = chatContainer.height - 20
-end
-
--- Create input area
-function UIManager:createInputArea(_w, _h)
-    if not _w or not _h then
-        print("Error: Invalid dimensions for input area")
-        return
-    end
-    
-    -- Input background
-    local inputBg = display.newRoundedRect(_w/2, _h - 80, _w - 120, 50, 25)
-    if inputBg then
-        inputBg:setFillColor(0.9, 0.9, 0.9, 0.8)
-        inputBg:setStrokeColor(0.7, 0.7, 0.7, 1)
-        inputBg.strokeWidth = 2
-    end
-    
-    -- Create proper text input field for Solar2D simulator
-    local success, result = pcall(function()
-        inputField = native.newTextField(_w/2, _h - 80, _w - 160, 40)
-        if inputField then
-            inputField.placeholder = "Type your message here..."
-            inputField.font = native.newFont(native.systemFont, 16)
-            inputField:addEventListener("userInput", function(event)
-                if event.phase == "submitted" then
-                    self:handleSend()
-                end
-            end)
-        end
-        return inputField
-    end)
-    
-    if not success or not inputField then
-        print("Warning: Native text field not available, using fallback")
-        -- Create a clickable text input simulation
-        inputField = display.newText({
-            text = "Click to type message",
-            x = _w/2,
-            y = _h - 80,
-            font = native.systemFont,
-            fontSize = 16
-        })
-        if inputField then
-            inputField:setFillColor(0.5, 0.5, 0.5, 1)
-            inputField.text = ""
-            inputField.isSimulated = true
-            
-            -- Add tap handler for simulated input
-            inputField:addEventListener("tap", function()
-                self:showTextInputDialog()
-            end)
-        end
-    end
-    
-    -- Send button
-    sendButton = display.newRoundedRect(_w - 60, _h - 80, 50, 40, 20)
-    if sendButton then
-        sendButton:setFillColor(0.2, 0.6, 1.0, 0.9)
-        sendButton:setStrokeColor(0.1, 0.4, 0.8, 1)
-        sendButton.strokeWidth = 2
-        
-        local sendText = display.newText({
-            text = "Send",
-            x = sendButton.x,
-            y = sendButton.y,
-            font = native.systemFont,
-            fontSize = 14
-        })
-        if sendText then
-            sendText:setFillColor(1, 1, 1, 1)
-        end
-        
-        sendButton:addEventListener("tap", function()
-            self:handleSend()
-        end)
-    end
-end
-
--- Create status bar
-function UIManager:createStatusBar(_w, _h)
-    if not _w or not _h then
-        print("Error: Invalid dimensions for status bar")
-        return
-    end
-    
-    statusLabel = display.newText({
-        text = "AI Assistant Ready",
-        x = 20,
-        y = 40,
-        font = native.systemFont,
-        fontSize = 14,
-        align = "left"
-    })
-    if statusLabel then
-        statusLabel:setFillColor(0.3, 0.3, 0.3, 1)
-        statusLabel.anchorX = 0
-    end
-end
-
--- Create memory display
-function UIManager:createMemoryDisplay(_w, _h)
-    if not _w or not _h then
-        print("Error: Invalid dimensions for memory display")
-        return
-    end
-    
-    memoryLabel = display.newText({
-        text = "Memory: 0 conversations",
-        x = _w - 20,
-        y = 40,
-        font = native.systemFont,
-        fontSize = 12,
-        align = "right"
-    })
-    if memoryLabel then
-        memoryLabel:setFillColor(0.5, 0.5, 0.5, 1)
-        memoryLabel.anchorX = 1
-    end
-    
-    -- Clear memory button
-    clearButton = display.newRoundedRect(_w - 100, 60, 80, 25, 12)
-    if clearButton then
-        clearButton:setFillColor(0.8, 0.3, 0.3, 0.8)
-        
-        local clearText = display.newText({
-            text = "Clear",
-            x = clearButton.x,
-            y = clearButton.y,
-            font = native.systemFont,
-            fontSize = 12
-        })
-        if clearText then
-            clearText:setFillColor(1, 1, 1, 1)
-        end
-        
-        clearButton:addEventListener("tap", function()
-            self:handleClearMemory()
-        end)
-    end
-end
-
--- Add chat bubble
+-- Add chat bubble with instance scope
 function UIManager:addChatBubble(text, isUser)
     if not text then
         print("Error: No text provided for chat bubble")
         return
     end
     
-    if not chatContainer or not chatContainer.messagesGroup then
+    if not self.state.chatContainer or not self.state.chatContainer.messagesGroup then
         print("Error: Chat container not initialized")
         return
     end
+    
+    local bubbleStyle = {
+        userBubble = {
+            backgroundColor = {0.2, 0.6, 1.0, 0.9},
+            textColor = {1, 1, 1, 1},
+            cornerRadius = 15,
+            maxWidth = 250
+        },
+        aiBubble = {
+            backgroundColor = {0.9, 0.9, 0.9, 0.9},
+            textColor = {0.2, 0.2, 0.2, 1},
+            cornerRadius = 15,
+            maxWidth = 250
+        }
+    }
     
     local style = isUser and bubbleStyle.userBubble or bubbleStyle.aiBubble
     
@@ -512,62 +583,62 @@ function UIManager:addChatBubble(text, isUser)
         
         -- Position bubble
         if isUser then
-            bubbleGroup.x = chatContainer.width - bubble.width/2 - 20
+            bubbleGroup.x = self.state.chatContainer.width - bubble.width/2 - 20
         else
             bubbleGroup.x = bubble.width/2 + 20
         end
         
         -- Position vertically
-        bubbleGroup.y = chatContainer.currentY + 30
+        bubbleGroup.y = self.state.chatContainer.currentY + 30
         
         -- Add to messages group
-        chatContainer.messagesGroup:insert(bubbleGroup)
+        self.state.chatContainer.messagesGroup:insert(bubbleGroup)
         
         -- Update current Y position
-        chatContainer.currentY = chatContainer.currentY + 80
+        self.state.chatContainer.currentY = self.state.chatContainer.currentY + 80
         
         -- Simple auto-scroll
-        if chatContainer.currentY > chatContainer.maxY then
-            for i = 1, chatContainer.messagesGroup.numChildren do
-                local child = chatContainer.messagesGroup[i]
+        if self.state.chatContainer.currentY > self.state.chatContainer.maxY then
+            for i = 1, self.state.chatContainer.messagesGroup.numChildren do
+                local child = self.state.chatContainer.messagesGroup[i]
                 if child and child.y then
                     child.y = child.y - 80
                 end
             end
-            chatContainer.currentY = chatContainer.currentY - 80
+            self.state.chatContainer.currentY = self.state.chatContainer.currentY - 80
         end
         
         return bubbleGroup
     end
 end
 
--- Update status
+-- Update status with instance scope
 function UIManager:updateStatus(text)
-    if statusLabel and text then
-        statusLabel.text = text
+    if self.state.statusLabel and text then
+        self.state.statusLabel.text = text
     end
 end
 
--- Update memory stats
+-- Update memory stats with instance scope
 function UIManager:updateMemoryStats(stats)
-    if memoryLabel and stats then
-        memoryLabel.text = "Memory: " .. (stats.conversationCount or 0) .. " conversations"
+    if self.state.memoryLabel and stats then
+        self.state.memoryLabel.text = "Memory: " .. (stats.conversationCount or 0) .. " conversations"
     end
 end
 
--- Handle send button
+-- Handle send button with instance scope
 function UIManager:handleSend()
     -- Check if we have a real text field
-    if inputField and inputField.text then
-        local text = inputField.text
+    if self.state.inputField and self.state.inputField.text then
+        local text = self.state.inputField.text
         local isValid, sanitizedText = validateInput(text)
         
         if isValid then
             self:processUserInput(sanitizedText)
             -- Clear the input field
-            inputField.text = ""
-            if inputField.setText then
-                inputField:setText("")
+            self.state.inputField.text = ""
+            if self.state.inputField.setText then
+                self.state.inputField:setText("")
             end
         else
             print("Input validation failed:", sanitizedText)
@@ -582,9 +653,9 @@ function UIManager:handleSend()
             "What is the weather like?"
         }
         
-        local demoIndex = (self.demoCounter or 0) % #demoMessages + 1
+        local demoIndex = (self.state.demoCounter or 0) % #demoMessages + 1
         local text = demoMessages[demoIndex]
-        self.demoCounter = (self.demoCounter or 0) + 1
+        self.state.demoCounter = (self.state.demoCounter or 0) + 1
         
         if text and text ~= "" then
             self:processUserInput(text)
@@ -592,26 +663,48 @@ function UIManager:handleSend()
     end
 end
 
--- Handle clear memory
+-- Handle clear memory with instance scope
 function UIManager:handleClearMemory()
     -- Clear chat display
-    if chatContainer and chatContainer.messagesGroup then
-        chatContainer.messagesGroup:removeSelf()
-        chatContainer.messagesGroup = display.newGroup()
-        if chatContainer.messagesGroup then
-            chatContainer.messagesGroup.x = chatContainer.x
-            chatContainer.messagesGroup.y = chatContainer.y
-            chatContainer:insert(chatContainer.messagesGroup)
-            chatContainer.currentY = 10
+    if self.state.chatContainer and self.state.chatContainer.messagesGroup then
+        self.state.chatContainer.messagesGroup:removeSelf()
+        self.state.chatContainer.messagesGroup = display.newGroup()
+        if self.state.chatContainer.messagesGroup then
+            self.state.chatContainer.messagesGroup.x = self.state.chatContainer.x
+            self.state.chatContainer.messagesGroup.y = self.state.chatContainer.y
+            self.state.chatContainer:insert(self.state.chatContainer.messagesGroup)
+            self.state.chatContainer.currentY = 10
         end
     end
     
     -- Reset demo counter
-    self.demoCounter = 0
+    self.state.demoCounter = 0
     
     -- Update displays
     self:updateStatus("Memory cleared - AI Assistant Ready")
     self:updateMemoryStats({conversationCount = 0})
+end
+
+-- Cleanup function with instance scope
+function UIManager:cleanup()
+    print("Cleaning up UI Manager...")
+    
+    -- Cleanup dialog
+    self:cleanupDialog()
+    
+    -- Remove display objects
+    safeRemove(self.state.chatContainer)
+    safeRemove(self.state.inputField)
+    safeRemove(self.state.sendButton)
+    safeRemove(self.state.statusLabel)
+    safeRemove(self.state.memoryLabel)
+    safeRemove(self.state.clearButton)
+    
+    -- Reset state
+    self.state = createInstanceState()
+    self.state.isInitialized = false
+    
+    print("✓ UI Manager cleanup completed")
 end
 
 return UIManager

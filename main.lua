@@ -1,25 +1,44 @@
 -- Caleb's AI Assistant - Main Application
 -- Expert-level Solar2D implementation with comprehensive error handling
 
--- Get display dimensions
+-- ============================================================================
+-- DEPENDENCY MANAGEMENT & SCOPE CONTROL
+-- ============================================================================
+
+-- Get display dimensions (must be first)
 local _w = display.actualContentWidth
 local _h = display.actualContentHeight
 
--- Validate display dimensions
+-- Validate display dimensions (critical validation)
 if not _w or not _h then
     print("Error: Invalid display dimensions")
     return
 end
 
--- Application state
+-- ============================================================================
+-- APPLICATION STATE MANAGEMENT
+-- ============================================================================
+
+-- Central application state (single source of truth)
 local app = {
-    aiRobot = nil,
-    uiManager = nil,
+    -- Core modules (loaded in dependency order)
+    modules = {
+        knowledgeBase = nil,
+        llmCore = nil,
+        aiRobot = nil,
+        uiManager = nil
+    },
+    
+    -- UI state
     personalityButtons = {},
-    currentPersonalityIndex = 1
+    currentPersonalityIndex = 1,
+    
+    -- System state
+    isInitialized = false,
+    isShuttingDown = false
 }
 
--- Personality options
+-- Personality options (immutable configuration)
 local personalities = {
     "helpful",
     "creative", 
@@ -27,34 +46,107 @@ local personalities = {
     "friendly"
 }
 
--- Safe module loading function
-local function safeRequire(modulePath)
+-- ============================================================================
+-- SAFETY & ERROR HANDLING FUNCTIONS
+-- ============================================================================
+
+-- Safe module loading with dependency tracking
+local function safeRequire(modulePath, dependencyName)
+    if not modulePath then
+        print("Error: No module path provided")
+        return nil
+    end
+    
     local success, result = pcall(require, modulePath)
     if success then
+        if dependencyName then
+            app.modules[dependencyName] = result
+            print("✓ Loaded module:", dependencyName)
+        end
         return result
     else
-        print("Warning: Failed to load module:", modulePath, "-", result)
+        print("✗ Failed to load module:", modulePath, "-", result)
         return nil
     end
 end
 
--- Safe function call wrapper
-local function safeCall(func, ...)
-    if func and type(func) == "function" then
-        local success, result = pcall(func, ...)
-        if not success then
-            print("Warning: Function call failed:", result)
-        end
-        return success, result
+-- Safe function call wrapper with scope validation
+local function safeCall(func, context, ...)
+    if not func then
+        print("Warning: Function not provided")
+        return false, "Function not available"
     end
-    return false, "Function not available"
+    
+    if type(func) ~= "function" then
+        print("Warning: Invalid function type")
+        return false, "Invalid function type"
+    end
+    
+    if context and type(context) ~= "table" then
+        print("Warning: Invalid context object")
+        return false, "Invalid context"
+    end
+    
+    local success, result = pcall(func, context, ...)
+    if not success then
+        print("Warning: Function call failed:", result)
+    end
+    return success, result
 end
 
--- Create personality selector
+-- ============================================================================
+-- MODULE INITIALIZATION (DEPENDENCY ORDER)
+-- ============================================================================
+
+-- Initialize modules in dependency order
+local function initializeModules()
+    print("Initializing modules in dependency order...")
+    
+    -- 1. Load Knowledge Base first (no dependencies)
+    local KnowledgeBase = safeRequire("Definitions.knowledge_base", "knowledgeBase")
+    if not KnowledgeBase then
+        print("Critical Error: Knowledge Base required for system operation")
+        return false
+    end
+    
+    -- 2. Load LLM Core (depends on Knowledge Base)
+    local LLMCore = safeRequire("Definitions.llm_core", "llmCore")
+    if not LLMCore then
+        print("Critical Error: LLM Core required for AI functionality")
+        return false
+    end
+    
+    -- 3. Load AI Robot (depends on LLM Core)
+    local AIRobot = safeRequire("Definitions.ai_robot", "aiRobot")
+    if not AIRobot then
+        print("Warning: AI Robot not available, continuing without visual feedback")
+    end
+    
+    -- 4. Load UI Manager (depends on all other modules)
+    local UIManager = safeRequire("Framework.ui_manager", "uiManager")
+    if not UIManager then
+        print("Critical Error: UI Manager required for user interaction")
+        return false
+    end
+    
+    print("✓ All modules loaded successfully")
+    return true
+end
+
+-- ============================================================================
+-- UI COMPONENT CREATION (SCOPE ISOLATED)
+-- ============================================================================
+
+-- Create personality selector with proper scope
 local function createPersonalitySelector()
     if not _w or not _h then
         print("Error: Invalid dimensions for personality selector")
-        return
+        return false
+    end
+    
+    if not personalities or #personalities == 0 then
+        print("Error: No personality options defined")
+        return false
     end
     
     local buttonWidth = 80
@@ -88,11 +180,17 @@ local function createPersonalitySelector()
                 buttonText:setFillColor(0.3, 0.3, 0.3, 1)
             end
             
-            -- Store reference
+            -- Store reference in app state
             app.personalityButtons[i] = button
             
-            -- Add tap handler
+            -- Add tap handler with proper scope
             button:addEventListener("tap", function()
+                -- Validate app state before proceeding
+                if app.isShuttingDown then
+                    print("Warning: App shutting down, ignoring tap")
+                    return
+                end
+                
                 -- Reset all buttons
                 for j, btn in ipairs(app.personalityButtons) do
                     if btn then
@@ -103,27 +201,38 @@ local function createPersonalitySelector()
                 -- Highlight selected button
                 button:setFillColor(0.2, 0.6, 1.0, 0.9)
                 
-                -- Update personality
+                -- Update personality with proper validation
                 app.currentPersonalityIndex = i
-                if app.aiRobot and app.aiRobot.setPersonality then
-                    safeCall(app.aiRobot.setPersonality, app.aiRobot, personality)
+                if app.modules.aiRobot and app.modules.aiRobot.setPersonality then
+                    safeCall(app.modules.aiRobot.setPersonality, app.modules.aiRobot, personality)
                 end
             end)
         end
     end
+    
+    return true
 end
 
--- Initialize the application
+-- ============================================================================
+-- APPLICATION INITIALIZATION (EXECUTION ORDER)
+-- ============================================================================
+
+-- Initialize the application with proper scope and order
 local function initApp()
     print("Initializing Caleb's AI Assistant...")
     
-    -- Create background
+    -- Step 1: Load all modules in dependency order
+    if not initializeModules() then
+        print("Critical Error: Module initialization failed")
+        return false
+    end
+    
+    -- Step 2: Create UI components
     local background = display.newRect(_w/2, _h/2, _w, _h)
     if background then
         background:setFillColor(0.95, 0.97, 1.0, 1)
     end
     
-    -- Create title
     local title = display.newText({
         text = "Caleb's AI Assistant",
         x = _w/2,
@@ -135,59 +244,61 @@ local function initApp()
         title:setFillColor(0.2, 0.2, 0.2, 1)
     end
     
-    -- Initialize AI Robot
-    local AIRobot = safeRequire("Definitions.ai_robot")
-    if AIRobot then
-        app.aiRobot = AIRobot:new()
-        if app.aiRobot and app.aiRobot.createSprite then
-            local robotSprite = safeCall(app.aiRobot.createSprite, app.aiRobot)
+    -- Step 3: Initialize AI Robot with proper scope
+    if app.modules.aiRobot then
+        local robotInstance = app.modules.aiRobot:new()
+        if robotInstance and robotInstance.createSprite then
+            local robotSprite = safeCall(robotInstance.createSprite, robotInstance)
             if not robotSprite then
                 print("Warning: Failed to create robot sprite")
             end
         end
-    else
-        print("Warning: AI Robot module not available")
+        app.modules.aiRobot = robotInstance
     end
     
-    -- Initialize UI Manager
-    local UIManager = safeRequire("Framework.ui_manager")
-    if UIManager then
-        app.uiManager = UIManager:new()
-        if app.uiManager and app.uiManager.init then
-            local initSuccess = safeCall(app.uiManager.init, app.uiManager)
+    -- Step 4: Initialize UI Manager with proper scope
+    if app.modules.uiManager then
+        local uiInstance = app.modules.uiManager:new()
+        if uiInstance and uiInstance.init then
+            local initSuccess = safeCall(uiInstance.init, uiInstance)
             if not initSuccess then
                 print("Warning: UI Manager initialization failed")
             end
         end
         
-        -- Make AI robot available to UI manager
-        if app.uiManager then
-            app.uiManager.aiRobot = app.aiRobot
+        -- Establish proper object relationships
+        if uiInstance then
+            uiInstance.aiRobot = app.modules.aiRobot
+            uiInstance.llmCore = app.modules.llmCore
+            uiInstance.knowledgeBase = app.modules.knowledgeBase
         end
-    else
-        print("Warning: UI Manager module not available")
+        app.modules.uiManager = uiInstance
     end
     
-    -- Create personality selector
-    createPersonalitySelector()
+    -- Step 5: Create personality selector
+    if not createPersonalitySelector() then
+        print("Warning: Personality selector creation failed")
+    end
     
-    -- Set initial personality
-    if app.aiRobot and app.aiRobot.setPersonality then
-        safeCall(app.aiRobot.setPersonality, app.aiRobot, "helpful")
+    -- Step 6: Set initial personality
+    if app.modules.aiRobot and app.modules.aiRobot.setPersonality then
+        safeCall(app.modules.aiRobot.setPersonality, app.modules.aiRobot, "helpful")
     end
     
     if app.personalityButtons[1] then
         app.personalityButtons[1]:setFillColor(0.2, 0.6, 1.0, 0.9)
     end
     
-    -- Add welcome message
+    -- Step 7: Add welcome message with proper timing
     timer.performWithDelay(500, function()
-        if app.uiManager and app.uiManager.addChatBubble then
-            safeCall(app.uiManager.addChatBubble, app.uiManager, "Hello! I'm Caleb's AI assistant. How can I help you today?", false)
+        if app.isShuttingDown then return end
+        
+        if app.modules.uiManager and app.modules.uiManager.addChatBubble then
+            safeCall(app.modules.uiManager.addChatBubble, app.modules.uiManager, "Hello! I'm Caleb's AI assistant. How can I help you today?", false)
         end
     end)
     
-    -- Add system info
+    -- Step 8: Add system info
     local systemInfo = display.newText({
         text = "AI System v2.0 - Enhanced LLM with Memory & Context",
         x = _w/2,
@@ -199,15 +310,26 @@ local function initApp()
         systemInfo:setFillColor(0.5, 0.5, 0.5, 1)
     end
     
-    print("AI Assistant initialized successfully!")
+    -- Step 9: Mark initialization complete
+    app.isInitialized = true
+    print("✓ AI Assistant initialized successfully!")
+    return true
 end
 
--- Handle keyboard events
+-- ============================================================================
+-- EVENT HANDLERS (SCOPE AWARE)
+-- ============================================================================
+
+-- Handle keyboard events with proper scope validation
 local function onKeyEvent(event)
+    if app.isShuttingDown then
+        return false
+    end
+    
     if event.phase == "down" then
         if event.keyName == "enter" or event.keyName == "return" then
-            if app.uiManager and app.uiManager.handleSend then
-                safeCall(app.uiManager.handleSend, app.uiManager)
+            if app.modules.uiManager and app.modules.uiManager.handleSend then
+                safeCall(app.modules.uiManager.handleSend, app.modules.uiManager)
             end
             return true
         end
@@ -215,19 +337,35 @@ local function onKeyEvent(event)
     return false
 end
 
--- Handle system events
+-- Handle system events with proper cleanup
 local function onSystemEvent(event)
     if event.type == "applicationExit" then
+        app.isShuttingDown = true
+        
         -- Cleanup AI robot
-        if app.aiRobot and app.aiRobot.cleanup then
-            safeCall(app.aiRobot.cleanup, app.aiRobot)
+        if app.modules.aiRobot and app.modules.aiRobot.cleanup then
+            safeCall(app.modules.aiRobot.cleanup, app.modules.aiRobot)
         end
+        
+        -- Cleanup UI manager
+        if app.modules.uiManager and app.modules.uiManager.cleanup then
+            safeCall(app.modules.uiManager.cleanup, app.modules.uiManager)
+        end
+        
+        print("✓ Application shutdown complete")
     end
 end
 
--- Initialize the application
-initApp()
+-- ============================================================================
+-- APPLICATION STARTUP (FINAL EXECUTION ORDER)
+-- ============================================================================
 
--- Add event listeners
+-- Initialize the application
+if not initApp() then
+    print("Critical Error: Application initialization failed")
+    return
+end
+
+-- Add event listeners (must be last)
 Runtime:addEventListener("key", onKeyEvent)
 Runtime:addEventListener("system", onSystemEvent)
