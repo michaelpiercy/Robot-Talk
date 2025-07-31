@@ -2,24 +2,43 @@ settings =
 {
     android =
     {
+        versionCode = "1",
+        versionName = "1.0",
+        
         usesPermissions =
         {
+            "android.permission.INTERNET",
+            "android.permission.ACCESS_NETWORK_STATE",
         },
+        
+        usesFeatures =
+        {
+            "android.hardware.touchscreen",
+        },
+        
+        minSdkVersion = "21",
+        targetSdkVersion = "33",
     },
 
     orientation =
     {
         orientation =
         {
-                default = "portrait",
-                supported =
-                {
-                        "portrait", "portraitUpsideDown",
-                },
+            default = "portrait",
+            supported =
+            {
+                "portrait", "portraitUpsideDown",
+            },
         },
-
     },
 
+    plugins =
+    {
+        ["plugin.widget"] =
+        {
+            publisherId = "com.coronalabs"
+        },
+    },
 
     iphone =
     {
@@ -27,9 +46,7 @@ settings =
 
         plist =
         {
-            --CFBundleIdentifier = "com.appledts.GKTapper", -- temporary line for testing!
-
-            CFBundleIdentifier = "ie.michaelpiercy.matchme",
+            CFBundleIdentifier = "com.caleb.aiassistant",
 
             UIAppFonts =
             {
@@ -69,15 +86,6 @@ settings =
             },
 
             UIApplicationExitsOnSuspend = false,
-
-            FacebookAppID = "308076795961985",
-
-            CFBundleURLTypes = {
-                {
-                CFBundleURLSchemes = { "fb308076795961985", }
-                }
-            }
-
         }
     }
 }
