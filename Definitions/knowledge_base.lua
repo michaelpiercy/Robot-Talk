@@ -1,9 +1,31 @@
+---@meta
+---@diagnostic disable: undefined-global
+
 -- Knowledge Base Module for Caleb's AI Assistant
 -- Expert-level Solar2D implementation with comprehensive error handling
 
+---@class KnowledgeBase
+---@field knowledge table<string, table<string, string[]>> The structured knowledge repository
+---@field responsePatterns table<string, string[]> Response patterns for different question types
+
 local KnowledgeBase = {}
 
--- Structured knowledge repository
+-- ============================================================================
+-- KNOWLEDGE REPOSITORY
+-- ============================================================================
+
+---@class KnowledgeCategory
+---@field [string] string[] Array of responses for each topic
+
+---@class KnowledgeRepository
+---@field general KnowledgeCategory General knowledge responses
+---@field technology KnowledgeCategory Technology-related responses
+---@field science KnowledgeCategory Science-related responses
+---@field math KnowledgeCategory Mathematics-related responses
+---@field history KnowledgeCategory History-related responses
+---@field entertainment KnowledgeCategory Entertainment-related responses
+
+---@type KnowledgeRepository Structured knowledge repository
 local knowledge = {
     general = {
         greetings = {
@@ -149,7 +171,11 @@ local knowledge = {
     }
 }
 
--- Response patterns for different question types
+-- ============================================================================
+-- RESPONSE PATTERNS
+-- ============================================================================
+
+---@type table<string, string[]> Response patterns for different question types
 local responsePatterns = {
     what = {
         "That's a great question about %s!",
@@ -183,7 +209,14 @@ local responsePatterns = {
     }
 }
 
--- Input validation function
+-- ============================================================================
+-- UTILITY FUNCTIONS
+-- ============================================================================
+
+---Input validation function
+---@param input string|nil The input to validate
+---@return boolean valid Whether the input is valid
+---@return string|string sanitized The sanitized input or error message
 local function validateInput(input)
     if not input then return false, "No input provided" end
     if type(input) ~= "string" then return false, "Invalid input type" end
@@ -199,7 +232,14 @@ local function validateInput(input)
     return true, sanitized
 end
 
--- Get specific knowledge response
+-- ============================================================================
+-- CORE KNOWLEDGE BASE FUNCTIONALITY
+-- ============================================================================
+
+---Get specific knowledge response
+---@param category string The knowledge category
+---@param topic string The knowledge topic
+---@return string|nil The knowledge response or nil if not found
 function KnowledgeBase:getResponse(category, topic)
     if not category or not topic then
         print("Warning: Invalid category or topic")
@@ -224,7 +264,9 @@ function KnowledgeBase:getResponse(category, topic)
     return nil
 end
 
--- Find relevant information based on input
+---Find relevant information based on input
+---@param input string|nil The input text to search
+---@return {category: string, topic: string, response: string}[]|nil Array of relevant information or nil if failed
 function KnowledgeBase:findRelevantInfo(input)
     if not input then
         print("Warning: No input provided for knowledge search")
@@ -232,6 +274,7 @@ function KnowledgeBase:findRelevantInfo(input)
     end
     
     local inputLower = string.lower(input)
+    ---@type {category: string, topic: string, response: string}[]
     local relevantInfo = {}
     
     -- Search through all categories and topics
@@ -251,7 +294,9 @@ function KnowledgeBase:findRelevantInfo(input)
     return relevantInfo
 end
 
--- Get response pattern based on question type
+---Get response pattern based on question type
+---@param questionType string|nil The question type
+---@return string The response pattern
 function KnowledgeBase:getResponsePattern(questionType)
     if not questionType then
         return "Here's what I know about that:"
@@ -265,7 +310,9 @@ function KnowledgeBase:getResponsePattern(questionType)
     return "Here's what I know about that:"
 end
 
--- Analyze question type
+---Analyze question type
+---@param input string|nil The input text to analyze
+---@return string The detected question type
 function KnowledgeBase:analyzeQuestion(input)
     if not input then
         return "general"
@@ -273,6 +320,7 @@ function KnowledgeBase:analyzeQuestion(input)
     
     local inputLower = string.lower(input)
     
+    ---@type table<string, string[]> Question type patterns
     local questionTypes = {
         what = {"what", "what is", "what are", "what does", "what do"},
         how = {"how", "how does", "how do", "how to", "how can"},
@@ -292,7 +340,9 @@ function KnowledgeBase:analyzeQuestion(input)
     return "general"
 end
 
--- Generate intelligent response
+---Generate intelligent response
+---@param keywords string[] The keywords to search for
+---@return string The generated response
 function KnowledgeBase:generateIntelligentResponse(keywords)
     if not keywords or type(keywords) ~= "table" then
         print("Warning: Invalid keywords for intelligent response")
@@ -314,6 +364,7 @@ function KnowledgeBase:generateIntelligentResponse(keywords)
     
     -- If no specific knowledge found, try general responses
     if response == "" then
+        ---@type string[]
         local generalTopics = {"greetings", "farewells"}
         for _, topic in ipairs(generalTopics) do
             local generalResponse = self:getResponse("general", topic)
@@ -327,8 +378,10 @@ function KnowledgeBase:generateIntelligentResponse(keywords)
     return response
 end
 
--- Get random fact
+---Get random fact
+---@return string A random fact from the knowledge base
 function KnowledgeBase:getRandomFact()
+    ---@type {category: string, topic: string, response: string}[]
     local allFacts = {}
     
     -- Collect all facts from knowledge base
@@ -352,8 +405,10 @@ function KnowledgeBase:getRandomFact()
     return "I'm here to help you learn and explore!"
 end
 
--- Get available categories
+---Get available categories
+---@return string[] Array of available knowledge categories
 function KnowledgeBase:getCategories()
+    ---@type string[]
     local categories = {}
     for category, _ in pairs(knowledge) do
         table.insert(categories, category)
@@ -361,12 +416,15 @@ function KnowledgeBase:getCategories()
     return categories
 end
 
--- Get topics in a category
+---Get topics in a category
+---@param category string The category to get topics for
+---@return string[] Array of topics in the category
 function KnowledgeBase:getTopics(category)
     if not category or not knowledge[category] then
         return {}
     end
     
+    ---@type string[]
     local topics = {}
     for topic, _ in pairs(knowledge[category]) do
         table.insert(topics, topic)
@@ -374,7 +432,11 @@ function KnowledgeBase:getTopics(category)
     return topics
 end
 
--- Add new knowledge
+---Add new knowledge
+---@param category string The knowledge category
+---@param topic string The knowledge topic
+---@param response string The knowledge response
+---@return boolean success Whether the knowledge was added successfully
 function KnowledgeBase:addKnowledge(category, topic, response)
     if not category or not topic or not response then
         print("Warning: Invalid parameters for adding knowledge")
@@ -393,7 +455,8 @@ function KnowledgeBase:addKnowledge(category, topic, response)
     return true
 end
 
--- Constructor
+---Constructor
+---@return KnowledgeBase The new knowledge base instance
 function KnowledgeBase:new()
     local kb = {}
     setmetatable(kb, { __index = KnowledgeBase })

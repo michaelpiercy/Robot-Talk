@@ -1,3 +1,6 @@
+---@meta
+---@diagnostic disable: undefined-global
+
 -- Caleb's AI Assistant - Main Application
 -- Expert-level Solar2D implementation with comprehensive error handling
 
@@ -5,8 +8,9 @@
 -- DEPENDENCY MANAGEMENT & SCOPE CONTROL
 -- ============================================================================
 
--- Get display dimensions (must be first)
+---@type number Display width in pixels
 local _w = display.actualContentWidth
+---@type number Display height in pixels
 local _h = display.actualContentHeight
 
 -- Validate display dimensions (critical validation)
@@ -19,7 +23,14 @@ end
 -- APPLICATION STATE MANAGEMENT
 -- ============================================================================
 
--- Central application state (single source of truth)
+---@class AppState
+---@field modules table<string, any> Core modules loaded in dependency order
+---@field personalityButtons table<number, DisplayObject> Array of personality selector buttons
+---@field currentPersonalityIndex number Current selected personality index
+---@field isInitialized boolean Whether the application has been initialized
+---@field isShuttingDown boolean Whether the application is shutting down
+
+---@type AppState Central application state (single source of truth)
 local app = {
     -- Core modules (loaded in dependency order)
     modules = {
@@ -38,7 +49,7 @@ local app = {
     isShuttingDown = false
 }
 
--- Personality options (immutable configuration)
+---@type string[] Personality options (immutable configuration)
 local personalities = {
     "helpful",
     "creative", 
@@ -50,7 +61,10 @@ local personalities = {
 -- SAFETY & ERROR HANDLING FUNCTIONS
 -- ============================================================================
 
--- Safe module loading with dependency tracking
+---Safe module loading with dependency tracking
+---@param modulePath string The path to the module to load
+---@param dependencyName? string The name to store the module under in app.modules
+---@return any|nil The loaded module or nil if failed
 local function safeRequire(modulePath, dependencyName)
     if not modulePath then
         print("Error: No module path provided")
@@ -70,7 +84,12 @@ local function safeRequire(modulePath, dependencyName)
     end
 end
 
--- Safe function call wrapper with scope validation
+---Safe function call wrapper with scope validation
+---@param func function|nil The function to call
+---@param context table|nil The context object (self) for the function
+---@param ... any Additional arguments to pass to the function
+---@return boolean success Whether the function call succeeded
+---@return any result The result of the function call or error message
 local function safeCall(func, context, ...)
     if not func then
         print("Warning: Function not provided")
@@ -98,7 +117,8 @@ end
 -- MODULE INITIALIZATION (DEPENDENCY ORDER)
 -- ============================================================================
 
--- Initialize modules in dependency order
+---Initialize modules in dependency order
+---@return boolean success Whether all critical modules were loaded successfully
 local function initializeModules()
     print("Initializing modules in dependency order...")
     
@@ -137,7 +157,8 @@ end
 -- UI COMPONENT CREATION (SCOPE ISOLATED)
 -- ============================================================================
 
--- Create personality selector with proper scope
+---Create personality selector with proper scope
+---@return boolean success Whether the personality selector was created successfully
 local function createPersonalitySelector()
     if not _w or not _h then
         print("Error: Invalid dimensions for personality selector")
@@ -155,6 +176,7 @@ local function createPersonalitySelector()
     local startX = (_w - (#personalities * (buttonWidth + spacing) - spacing)) / 2
     
     for i, personality in ipairs(personalities) do
+        ---@type DisplayObject
         local button = display.newRoundedRect(
             startX + (i-1) * (buttonWidth + spacing),
             80,
@@ -168,6 +190,7 @@ local function createPersonalitySelector()
             button:setStrokeColor(0.6, 0.6, 0.6, 1)
             button.strokeWidth = 1
             
+            ---@type TextObject
             local buttonText = display.newText({
                 text = personality:sub(1,1):upper() .. personality:sub(2),
                 x = button.x,
@@ -217,7 +240,8 @@ end
 -- APPLICATION INITIALIZATION (EXECUTION ORDER)
 -- ============================================================================
 
--- Initialize the application with proper scope and order
+---Initialize the application with proper scope and order
+---@return boolean success Whether the application was initialized successfully
 local function initApp()
     print("Initializing Caleb's AI Assistant...")
     
@@ -228,11 +252,13 @@ local function initApp()
     end
     
     -- Step 2: Create UI components
+    ---@type DisplayObject
     local background = display.newRect(_w/2, _h/2, _w, _h)
     if background then
         background:setFillColor(0.95, 0.97, 1.0, 1)
     end
     
+    ---@type TextObject
     local title = display.newText({
         text = "Caleb's AI Assistant",
         x = _w/2,
@@ -246,8 +272,10 @@ local function initApp()
     
     -- Step 3: Initialize AI Robot with proper scope
     if app.modules.aiRobot then
+        ---@type AIRobot
         local robotInstance = app.modules.aiRobot:new()
         if robotInstance and robotInstance.createSprite then
+            ---@type DisplayObject|nil
             local robotSprite = safeCall(robotInstance.createSprite, robotInstance)
             if not robotSprite then
                 print("Warning: Failed to create robot sprite")
@@ -258,6 +286,7 @@ local function initApp()
     
     -- Step 4: Initialize UI Manager with proper scope
     if app.modules.uiManager then
+        ---@type UIManager
         local uiInstance = app.modules.uiManager:new()
         if uiInstance and uiInstance.init then
             local initSuccess = safeCall(uiInstance.init, uiInstance)
@@ -299,6 +328,7 @@ local function initApp()
     end)
     
     -- Step 8: Add system info
+    ---@type TextObject
     local systemInfo = display.newText({
         text = "AI System v2.0 - Enhanced LLM with Memory & Context",
         x = _w/2,
@@ -320,7 +350,9 @@ end
 -- EVENT HANDLERS (SCOPE AWARE)
 -- ============================================================================
 
--- Handle keyboard events with proper scope validation
+---Handle keyboard events with proper scope validation
+---@param event table The keyboard event object
+---@return boolean handled Whether the event was handled
 local function onKeyEvent(event)
     if app.isShuttingDown then
         return false
@@ -337,7 +369,8 @@ local function onKeyEvent(event)
     return false
 end
 
--- Handle system events with proper cleanup
+---Handle system events with proper cleanup
+---@param event table The system event object
 local function onSystemEvent(event)
     if event.type == "applicationExit" then
         app.isShuttingDown = true

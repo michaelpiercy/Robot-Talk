@@ -1,3 +1,6 @@
+---@meta
+---@diagnostic disable: undefined-global
+
 -- UI Manager for Caleb's AI Assistant
 -- Expert-level Solar2D implementation with comprehensive error handling
 
@@ -5,13 +8,33 @@
 -- MODULE DEFINITION & INSTANCE MANAGEMENT
 -- ============================================================================
 
+---@class UIManager
+---@field state UIState The instance-specific state
 local UIManager = {}
 
 -- ============================================================================
 -- INSTANCE STATE MANAGEMENT
 -- ============================================================================
 
--- Instance-specific state (not module globals)
+---@class UIState
+---@field chatContainer DisplayObject|nil The chat container display object
+---@field inputField DisplayObject|nil The input field display object
+---@field sendButton DisplayObject|nil The send button display object
+---@field statusLabel TextObject|nil The status label display object
+---@field memoryLabel TextObject|nil The memory label display object
+---@field clearButton DisplayObject|nil The clear button display object
+---@field activeDialog boolean Whether a dialog is currently active
+---@field dialogElements DisplayObject[] Array of dialog display objects
+---@field aiRobot AIRobot|nil Reference to the AI robot instance
+---@field llmCore LLMCore|nil Reference to the LLM core instance
+---@field knowledgeBase KnowledgeBase|nil Reference to the knowledge base instance
+---@field isInitialized boolean Whether the UI manager is initialized
+---@field demoCounter number Counter for demo messages
+---@field displayWidth number The display width in pixels
+---@field displayHeight number The display height in pixels
+
+---Instance-specific state (not module globals)
+---@return UIState The initialized UI state
 local function createInstanceState()
     return {
         -- UI Elements (instance-specific)
@@ -45,7 +68,8 @@ end
 -- SAFETY & UTILITY FUNCTIONS (INSTANCE-AGNOSTIC)
 -- ============================================================================
 
--- Safe element removal function
+---Safe element removal function
+---@param element DisplayObject|nil The display object to remove
 local function safeRemove(element)
     if element and element.removeSelf then
         local success, err = pcall(function()
@@ -57,7 +81,10 @@ local function safeRemove(element)
     end
 end
 
--- Input validation function
+---Input validation function
+---@param text string|nil The text to validate
+---@return boolean valid Whether the input is valid
+---@return string|string sanitized The sanitized text or error message
 local function validateInput(text)
     if not text then return false, "No input provided" end
     if type(text) ~= "string" then return false, "Invalid input type" end
@@ -77,7 +104,8 @@ end
 -- INSTANCE METHODS (PROPER SCOPE)
 -- ============================================================================
 
--- Constructor with proper instance isolation
+---Constructor with proper instance isolation
+---@return UIManager The new UI manager instance
 function UIManager:new()
     local instance = {}
     setmetatable(instance, { __index = UIManager })
@@ -88,7 +116,8 @@ function UIManager:new()
     return instance
 end
 
--- Initialize the UI with proper scope
+---Initialize the UI with proper scope
+---@return boolean success Whether the UI manager was initialized successfully
 function UIManager:init()
     if self.state.isInitialized then
         print("Warning: UI Manager already initialized")
@@ -129,7 +158,8 @@ function UIManager:init()
     return true
 end
 
--- Create chat container with instance scope
+---Create chat container with instance scope
+---@return boolean success Whether the chat container was created successfully
 function UIManager:createChatContainer()
     if not self.state.displayWidth or not self.state.displayHeight then
         print("Error: Invalid dimensions for chat container")
@@ -148,6 +178,7 @@ function UIManager:createChatContainer()
     self.state.chatContainer.height = self.state.displayHeight - 200
     
     -- Create chat background
+    ---@type DisplayObject
     local chatBackground = display.newRoundedRect(self.state.chatContainer.x, self.state.chatContainer.y, self.state.chatContainer.width, self.state.chatContainer.height, 10)
     if chatBackground then
         chatBackground:setFillColor(0.95, 0.95, 0.95, 0.3)
@@ -173,7 +204,8 @@ function UIManager:createChatContainer()
     return true
 end
 
--- Create input area with instance scope
+---Create input area with instance scope
+---@return boolean success Whether the input area was created successfully
 function UIManager:createInputArea()
     if not self.state.displayWidth or not self.state.displayHeight then
         print("Error: Invalid dimensions for input area")
@@ -181,6 +213,7 @@ function UIManager:createInputArea()
     end
     
     -- Input background
+    ---@type DisplayObject
     local inputBg = display.newRoundedRect(self.state.displayWidth/2, self.state.displayHeight - 80, self.state.displayWidth - 120, 50, 25)
     if inputBg then
         inputBg:setFillColor(0.9, 0.9, 0.9, 0.8)
@@ -232,6 +265,7 @@ function UIManager:createInputArea()
         self.state.sendButton:setStrokeColor(0.1, 0.4, 0.8, 1)
         self.state.sendButton.strokeWidth = 2
         
+        ---@type TextObject
         local sendText = display.newText({
             text = "Send",
             x = self.state.sendButton.x,
@@ -251,7 +285,8 @@ function UIManager:createInputArea()
     return true
 end
 
--- Create status bar with instance scope
+---Create status bar with instance scope
+---@return boolean success Whether the status bar was created successfully
 function UIManager:createStatusBar()
     if not self.state.displayWidth or not self.state.displayHeight then
         print("Error: Invalid dimensions for status bar")
@@ -274,7 +309,8 @@ function UIManager:createStatusBar()
     return true
 end
 
--- Create memory display with instance scope
+---Create memory display with instance scope
+---@return boolean success Whether the memory display was created successfully
 function UIManager:createMemoryDisplay()
     if not self.state.displayWidth or not self.state.displayHeight then
         print("Error: Invalid dimensions for memory display")
@@ -299,6 +335,7 @@ function UIManager:createMemoryDisplay()
     if self.state.clearButton then
         self.state.clearButton:setFillColor(0.8, 0.3, 0.3, 0.8)
         
+        ---@type TextObject
         local clearText = display.newText({
             text = "Clear",
             x = self.state.clearButton.x,
@@ -322,7 +359,7 @@ end
 -- DIALOG MANAGEMENT (INSTANCE-SCOPED)
 -- ============================================================================
 
--- Safe cleanup dialog elements
+---Safe cleanup dialog elements
 function UIManager:cleanupDialog()
     if self.state.activeDialog then
         for _, element in ipairs(self.state.dialogElements) do
@@ -333,7 +370,7 @@ function UIManager:cleanupDialog()
     end
 end
 
--- Show text input dialog for simulator
+---Show text input dialog for simulator
 function UIManager:showTextInputDialog()
     -- Prevent multiple dialogs
     if self.state.activeDialog then
@@ -345,6 +382,7 @@ function UIManager:showTextInputDialog()
     self.state.dialogElements = {}
     
     -- Create dialog background
+    ---@type DisplayObject
     local dialogBg = display.newRoundedRect(self.state.displayWidth/2, self.state.displayHeight/2, 300, 150, 20)
     if dialogBg then
         dialogBg:setFillColor(1, 1, 1, 0.95)
@@ -354,6 +392,7 @@ function UIManager:showTextInputDialog()
     end
     
     -- Create title
+    ---@type TextObject
     local title = display.newText({
         text = "Enter your message:",
         x = self.state.displayWidth/2,
@@ -367,6 +406,7 @@ function UIManager:showTextInputDialog()
     end
     
     -- Create input field for dialog
+    ---@type DisplayObject|nil
     local dialogInput = nil
     local success, result = pcall(function()
         dialogInput = native.newTextField(self.state.displayWidth/2, self.state.displayHeight/2, 250, 30)
@@ -386,12 +426,14 @@ function UIManager:showTextInputDialog()
     end
     
     -- Create send button
+    ---@type DisplayObject
     local sendBtn = display.newRoundedRect(self.state.displayWidth/2 + 80, self.state.displayHeight/2 + 30, 60, 30, 15)
     if sendBtn then
         sendBtn:setFillColor(0.2, 0.6, 1.0, 0.9)
         table.insert(self.state.dialogElements, sendBtn)
     end
     
+    ---@type TextObject
     local sendText = display.newText({
         text = "Send",
         x = sendBtn and sendBtn.x or self.state.displayWidth/2 + 80,
@@ -405,12 +447,14 @@ function UIManager:showTextInputDialog()
     end
     
     -- Create cancel button
+    ---@type DisplayObject
     local cancelBtn = display.newRoundedRect(self.state.displayWidth/2 - 80, self.state.displayHeight/2 + 30, 60, 30, 15)
     if cancelBtn then
         cancelBtn:setFillColor(0.7, 0.7, 0.7, 0.9)
         table.insert(self.state.dialogElements, cancelBtn)
     end
     
+    ---@type TextObject
     local cancelText = display.newText({
         text = "Cancel",
         x = cancelBtn and cancelBtn.x or self.state.displayWidth/2 - 80,
@@ -452,7 +496,8 @@ end
 -- CORE FUNCTIONALITY (INSTANCE-SCOPED)
 -- ============================================================================
 
--- Process user input with validation
+---Process user input with validation
+---@param text string The user input text to process
 function UIManager:processUserInput(text)
     local isValid, sanitizedText = validateInput(text)
     if not isValid then
@@ -517,7 +562,10 @@ function UIManager:processUserInput(text)
     end
 end
 
--- Add chat bubble with instance scope
+---Add chat bubble with instance scope
+---@param text string The text to display in the chat bubble
+---@param isUser boolean Whether this is a user message (true) or AI message (false)
+---@return DisplayObject|nil The created chat bubble group or nil if failed
 function UIManager:addChatBubble(text, isUser)
     if not text then
         print("Error: No text provided for chat bubble")
@@ -529,6 +577,13 @@ function UIManager:addChatBubble(text, isUser)
         return
     end
     
+    ---@class BubbleStyle
+    ---@field backgroundColor number[] Background color RGBA values
+    ---@field textColor number[] Text color RGBA values
+    ---@field cornerRadius number Corner radius for rounded rectangle
+    ---@field maxWidth number Maximum width of the bubble
+    
+    ---@type table<string, BubbleStyle>
     local bubbleStyle = {
         userBubble = {
             backgroundColor = {0.2, 0.6, 1.0, 0.9},
@@ -547,6 +602,7 @@ function UIManager:addChatBubble(text, isUser)
     local style = isUser and bubbleStyle.userBubble or bubbleStyle.aiBubble
     
     -- Create bubble background
+    ---@type DisplayObject
     local bubble = display.newRoundedRect(0, 0, style.maxWidth, 60, style.cornerRadius)
     if not bubble then
         print("Error: Failed to create bubble background")
@@ -558,6 +614,7 @@ function UIManager:addChatBubble(text, isUser)
     bubble.strokeWidth = 1
     
     -- Create text
+    ---@type TextObject
     local textObj = display.newText({
         text = text,
         x = 0,
@@ -576,6 +633,7 @@ function UIManager:addChatBubble(text, isUser)
     textObj:setFillColor(unpack(style.textColor))
     
     -- Group bubble and text
+    ---@type DisplayObject
     local bubbleGroup = display.newGroup()
     if bubbleGroup then
         bubbleGroup:insert(bubble)
@@ -612,21 +670,23 @@ function UIManager:addChatBubble(text, isUser)
     end
 end
 
--- Update status with instance scope
+---Update status with instance scope
+---@param text string The status text to display
 function UIManager:updateStatus(text)
     if self.state.statusLabel and text then
         self.state.statusLabel.text = text
     end
 end
 
--- Update memory stats with instance scope
+---Update memory stats with instance scope
+---@param stats table The memory statistics table
 function UIManager:updateMemoryStats(stats)
     if self.state.memoryLabel and stats then
         self.state.memoryLabel.text = "Memory: " .. (stats.conversationCount or 0) .. " conversations"
     end
 end
 
--- Handle send button with instance scope
+---Handle send button with instance scope
 function UIManager:handleSend()
     -- Check if we have a real text field
     if self.state.inputField and self.state.inputField.text then
@@ -663,7 +723,7 @@ function UIManager:handleSend()
     end
 end
 
--- Handle clear memory with instance scope
+---Handle clear memory with instance scope
 function UIManager:handleClearMemory()
     -- Clear chat display
     if self.state.chatContainer and self.state.chatContainer.messagesGroup then
@@ -685,7 +745,7 @@ function UIManager:handleClearMemory()
     self:updateMemoryStats({conversationCount = 0})
 end
 
--- Cleanup function with instance scope
+---Cleanup function with instance scope
 function UIManager:cleanup()
     print("Cleaning up UI Manager...")
     

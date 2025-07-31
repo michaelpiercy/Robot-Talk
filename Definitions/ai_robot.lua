@@ -1,9 +1,36 @@
+---@meta
+---@diagnostic disable: undefined-global
+
 -- AI Robot Module for Caleb's AI Assistant
 -- Expert-level Solar2D implementation with comprehensive error handling
 
+---@class AIRobot
+---@field sprite DisplayObject|nil The robot sprite display object
+---@field personalityIndicator TextObject|nil The personality indicator text
+---@field energyBar DisplayObject|nil The energy bar display object
+---@field moodIndicator TextObject|nil The mood indicator text
+---@field currentPersonality string The current personality setting
+---@field currentMood string The current mood state
+---@field energyLevel number The current energy level (0-100)
+---@field isAnimating boolean Whether an animation is currently playing
+
 local AIRobot = {}
 
--- Robot state
+-- ============================================================================
+-- ROBOT STATE MANAGEMENT
+-- ============================================================================
+
+---@class RobotState
+---@field sprite DisplayObject|nil The robot sprite display object
+---@field personalityIndicator TextObject|nil The personality indicator text
+---@field energyBar DisplayObject|nil The energy bar display object
+---@field moodIndicator TextObject|nil The mood indicator text
+---@field currentPersonality string The current personality setting
+---@field currentMood string The current mood state
+---@field energyLevel number The current energy level (0-100)
+---@field isAnimating boolean Whether an animation is currently playing
+
+---@type RobotState Robot state
 local robotState = {
     sprite = nil,
     personalityIndicator = nil,
@@ -15,7 +42,17 @@ local robotState = {
     isAnimating = false
 }
 
--- Animation states
+-- ============================================================================
+-- ANIMATION CONFIGURATION
+-- ============================================================================
+
+---@class AnimationConfig
+---@field duration number Animation duration in milliseconds
+---@field alpha? number[] Alpha values for animation
+---@field scale? number[] Scale values for animation
+---@field rotation? number[] Rotation values for animation
+
+---@type table<string, AnimationConfig> Animation states
 local animations = {
     idle = {
         duration = 2000,
@@ -39,7 +76,17 @@ local animations = {
     }
 }
 
--- Personality responses
+-- ============================================================================
+-- PERSONALITY RESPONSES
+-- ============================================================================
+
+---@class PersonalityResponses
+---@field greeting string Greeting response
+---@field thinking string Thinking response
+---@field excited string Excited response
+---@field sad string Sad response
+
+---@type table<string, PersonalityResponses> Personality responses
 local personalityResponses = {
     helpful = {
         greeting = "Hello! How can I assist you today?",
@@ -67,7 +114,12 @@ local personalityResponses = {
     }
 }
 
--- Safe element removal function
+-- ============================================================================
+-- SAFETY & UTILITY FUNCTIONS
+-- ============================================================================
+
+---Safe element removal function
+---@param element DisplayObject|nil The display object to remove
 local function safeRemove(element)
     if element and element.removeSelf then
         local success, err = pcall(function()
@@ -79,7 +131,10 @@ local function safeRemove(element)
     end
 end
 
--- Safe transition function
+---Safe transition function
+---@param target DisplayObject|nil The target display object
+---@param params table The transition parameters
+---@return boolean success Whether the transition was successful
 local function safeTransition(target, params)
     if target and transition and transition.to then
         local success, err = pcall(function()
@@ -93,7 +148,12 @@ local function safeTransition(target, params)
     return false
 end
 
--- Create robot sprite
+-- ============================================================================
+-- CORE ROBOT FUNCTIONALITY
+-- ============================================================================
+
+---Create robot sprite
+---@return DisplayObject|nil The created robot sprite or nil if failed
 function AIRobot:createSprite()
     if not display or not display.newImageRect then
         print("Error: Display system not available")
@@ -110,6 +170,7 @@ function AIRobot:createSprite()
     end
     
     -- Create robot body (simple rectangle for now)
+    ---@type DisplayObject
     local robotBody = display.newRoundedRect(_w/2, _h/2 - 150, 80, 100, 20)
     if not robotBody then
         print("Error: Failed to create robot body")
@@ -121,6 +182,7 @@ function AIRobot:createSprite()
     robotBody.strokeWidth = 3
     
     -- Create robot head
+    ---@type DisplayObject
     local robotHead = display.newCircle(_w/2, _h/2 - 200, 30)
     if robotHead then
         robotHead:setFillColor(0.4, 0.4, 0.4, 1)
@@ -129,17 +191,20 @@ function AIRobot:createSprite()
     end
     
     -- Create eyes
+    ---@type DisplayObject
     local leftEye = display.newCircle(_w/2 - 10, _h/2 - 205, 5)
     if leftEye then
         leftEye:setFillColor(0, 1, 0, 1) -- Green eyes
     end
     
+    ---@type DisplayObject
     local rightEye = display.newCircle(_w/2 + 10, _h/2 - 205, 5)
     if rightEye then
         rightEye:setFillColor(0, 1, 0, 1) -- Green eyes
     end
     
     -- Create personality indicator
+    ---@type TextObject
     local personalityIndicator = display.newText({
         text = "Helpful",
         x = _w/2,
@@ -152,6 +217,7 @@ function AIRobot:createSprite()
     end
     
     -- Create energy bar background
+    ---@type DisplayObject
     local energyBarBg = display.newRect(_w/2, _h/2 - 20, 100, 10)
     if energyBarBg then
         energyBarBg:setFillColor(0.8, 0.8, 0.8, 1)
@@ -160,6 +226,7 @@ function AIRobot:createSprite()
     end
     
     -- Create energy bar
+    ---@type DisplayObject
     local energyBar = display.newRect(_w/2 - 45, _h/2 - 20, 90, 8)
     if energyBar then
         energyBar:setFillColor(0.2, 0.8, 0.2, 1)
@@ -167,6 +234,7 @@ function AIRobot:createSprite()
     end
     
     -- Create mood indicator
+    ---@type TextObject
     local moodIndicator = display.newText({
         text = "😊",
         x = _w/2,
@@ -190,7 +258,9 @@ function AIRobot:createSprite()
     return robotBody
 end
 
--- Play animation
+---Play animation
+---@param animationType string The type of animation to play
+---@return boolean success Whether the animation was started successfully
 function AIRobot:playAnimation(animationType)
     if not animationType or not animations[animationType] then
         print("Warning: Invalid animation type:", animationType)
@@ -273,14 +343,16 @@ function AIRobot:playAnimation(animationType)
     return true
 end
 
--- Start idle animation
+---Start idle animation
 function AIRobot:startIdleAnimation()
     if not robotState.isAnimating then
         self:playAnimation("idle")
     end
 end
 
--- Update mood
+---Update mood
+---@param mood string The mood to set
+---@return boolean success Whether the mood was updated successfully
 function AIRobot:updateMood(mood)
     if not mood then
         print("Warning: No mood specified")
@@ -289,6 +361,7 @@ function AIRobot:updateMood(mood)
     
     robotState.currentMood = mood
     
+    ---@type table<string, string> Mood emoji mapping
     local moodEmojis = {
         happy = "😊",
         excited = "🤖",
@@ -305,7 +378,9 @@ function AIRobot:updateMood(mood)
     return false
 end
 
--- Update energy bar
+---Update energy bar
+---@param energy number The energy level (0-100)
+---@return boolean success Whether the energy bar was updated successfully
 function AIRobot:updateEnergyBar(energy)
     if not energy or type(energy) ~= "number" then
         print("Warning: Invalid energy value")
@@ -334,7 +409,9 @@ function AIRobot:updateEnergyBar(energy)
     return false
 end
 
--- Process input and determine sentiment
+---Process input and determine sentiment
+---@param input string The input text to analyze
+---@return string|false sentiment The detected sentiment or false if failed
 function AIRobot:processInput(input)
     if not input or type(input) ~= "string" then
         print("Warning: Invalid input for robot processing")
@@ -342,8 +419,11 @@ function AIRobot:processInput(input)
     end
     
     -- Simple sentiment analysis
+    ---@type string[] Positive words for sentiment analysis
     local positiveWords = {"good", "great", "awesome", "excellent", "amazing", "love", "like", "happy", "excited"}
+    ---@type string[] Negative words for sentiment analysis
     local negativeWords = {"bad", "terrible", "awful", "hate", "dislike", "sad", "angry", "frustrated"}
+    ---@type string[] Question words for sentiment analysis
     local questionWords = {"what", "how", "why", "when", "where", "who", "which", "?"}
     
     local inputLower = string.lower(input)
@@ -409,7 +489,9 @@ function AIRobot:processInput(input)
     return sentiment
 end
 
--- Get personality response
+---Get personality response
+---@param responseType string The type of response to get
+---@return string The personality response
 function AIRobot:getPersonalityResponse(responseType)
     if not responseType or not robotState.currentPersonality then
         return "I'm here to help!"
@@ -423,7 +505,9 @@ function AIRobot:getPersonalityResponse(responseType)
     return personality[responseType] or "I'm here to help!"
 end
 
--- Set personality
+---Set personality
+---@param personality string The personality to set
+---@return boolean success Whether the personality was set successfully
 function AIRobot:setPersonality(personality)
     if not personality or type(personality) ~= "string" then
         print("Warning: Invalid personality specified")
@@ -439,7 +523,7 @@ function AIRobot:setPersonality(personality)
     return true
 end
 
--- Cleanup function
+---Cleanup function
 function AIRobot:cleanup()
     print("Cleaning up AI Robot...")
     
@@ -469,7 +553,8 @@ function AIRobot:cleanup()
     print("AI Robot cleanup completed")
 end
 
--- Constructor
+---Constructor
+---@return AIRobot The new AI robot instance
 function AIRobot:new()
     local robot = {}
     setmetatable(robot, { __index = AIRobot })
