@@ -35,6 +35,10 @@ if not _w or not _h then
     return
 end
 
+debugPrint("Solar2D Display Dimensions: " .. _w .. " x " .. _h)
+debugPrint("Content Area: " .. display.contentWidth .. " x " .. display.contentHeight)
+debugPrint("Pixel Density: " .. display.pixelDensity)
+
 -- ============================================================================
 -- APPLICATION STATE MANAGEMENT
 -- ============================================================================
