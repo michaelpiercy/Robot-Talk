@@ -12,66 +12,6 @@ app.uiManager = nil
 app.personalityButtons = {}
 app.currentPersonalityIndex = 1
 
--- Initialize the application
-local function initApp()
-    print("Initializing Caleb's AI Assistant...")
-    
-    -- Create background
-    local background = display.newRect(_w/2, _h/2, _w, _h)
-    background:setFillColor(0.95, 0.97, 1.0, 1)
-    
-    -- Create title
-    local title = display.newText({
-        text = "Caleb's AI Assistant",
-        x = _w/2,
-        y = 20,
-        font = native.systemFontBold,
-        fontSize = 18
-    })
-    title:setFillColor(0.2, 0.2, 0.2, 1)
-    
-    -- Initialize AI Robot
-    local AIRobot = require("Definitions.ai_robot")
-    app.aiRobot = AIRobot:new()
-    local robotSprite = app.aiRobot:createSprite()
-    
-    -- Initialize UI Manager
-    local UIManager = require("Framework.ui_manager")
-    app.uiManager = UIManager:new()
-    app.uiManager:init()
-    
-    -- Make AI robot available to UI manager
-    app.uiManager.aiRobot = app.aiRobot
-    
-    -- Create personality selector
-    createPersonalitySelector()
-    
-    -- Set initial personality
-    app.aiRobot:setPersonality("helpful")
-    if app.personalityButtons[1] then
-        app.personalityButtons[1]:setFillColor(0.2, 0.6, 1.0, 0.9)
-    end
-    
-    -- Add welcome message
-    timer.performWithDelay(500, function()
-        if app.uiManager and app.uiManager.addChatBubble then
-            app.uiManager:addChatBubble("Hello! I'm Caleb's AI assistant. How can I help you today?", false)
-        end
-    end)
-    
-    -- Add system info
-    local systemInfo = display.newText({
-        text = "AI System v2.0 - Enhanced LLM with Memory & Context",
-        x = _w/2,
-        y = _h - 20,
-        font = native.systemFont,
-        fontSize = 10
-    })
-    systemInfo:setFillColor(0.5, 0.5, 0.5, 1)
-    
-    print("AI Assistant initialized successfully!")
-end
-
 -- Create personality selector buttons
 local function createPersonalitySelector()
     local personalityLabel = display.newText({
@@ -134,6 +74,66 @@ local function createPersonalitySelector()
         local button = createPersonalityButton(personality, x, 80, personality)
         table.insert(app.personalityButtons, button)
     end
+end
+
+-- Initialize the application
+local function initApp()
+    print("Initializing Caleb's AI Assistant...")
+    
+    -- Create background
+    local background = display.newRect(_w/2, _h/2, _w, _h)
+    background:setFillColor(0.95, 0.97, 1.0, 1)
+    
+    -- Create title
+    local title = display.newText({
+        text = "Caleb's AI Assistant",
+        x = _w/2,
+        y = 20,
+        font = native.systemFontBold,
+        fontSize = 18
+    })
+    title:setFillColor(0.2, 0.2, 0.2, 1)
+    
+    -- Initialize AI Robot
+    local AIRobot = require("Definitions.ai_robot")
+    app.aiRobot = AIRobot:new()
+    local robotSprite = app.aiRobot:createSprite()
+    
+    -- Initialize UI Manager
+    local UIManager = require("Framework.ui_manager")
+    app.uiManager = UIManager:new()
+    app.uiManager:init()
+    
+    -- Make AI robot available to UI manager
+    app.uiManager.aiRobot = app.aiRobot
+    
+    -- Create personality selector
+    createPersonalitySelector()
+    
+    -- Set initial personality
+    app.aiRobot:setPersonality("helpful")
+    if app.personalityButtons[1] then
+        app.personalityButtons[1]:setFillColor(0.2, 0.6, 1.0, 0.9)
+    end
+    
+    -- Add welcome message
+    timer.performWithDelay(500, function()
+        if app.uiManager and app.uiManager.addChatBubble then
+            app.uiManager:addChatBubble("Hello! I'm Caleb's AI assistant. How can I help you today?", false)
+        end
+    end)
+    
+    -- Add system info
+    local systemInfo = display.newText({
+        text = "AI System v2.0 - Enhanced LLM with Memory & Context",
+        x = _w/2,
+        y = _h - 20,
+        font = native.systemFont,
+        fontSize = 10
+    })
+    systemInfo:setFillColor(0.5, 0.5, 0.5, 1)
+    
+    print("AI Assistant initialized successfully!")
 end
 
 -- Keyboard event handler
