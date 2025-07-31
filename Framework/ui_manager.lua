@@ -88,21 +88,38 @@ function UIManager:createInputArea(_w, _h)
     inputBg:setStrokeColor(0.7, 0.7, 0.7, 1)
     inputBg.strokeWidth = 2
     
-    -- Create simple text display for input (fallback)
-    inputField = display.newText({
-        text = "Tap to send demo message",
-        x = _w/2,
-        y = _h - 80,
-        font = native.systemFont,
-        fontSize = 16
-    })
-    inputField:setFillColor(0.5, 0.5, 0.5, 1)
-    inputField.text = ""
-    
-    -- Add tap handler for demo mode
-    inputField:addEventListener("tap", function()
-        self:handleSend()
+    -- Create proper text input field for Solar2D simulator
+    local success, result = pcall(function()
+        inputField = native.newTextField(_w/2, _h - 80, _w - 160, 40)
+        inputField.placeholder = "Type your message here..."
+        inputField.font = native.newFont(native.systemFont, 16)
+        inputField:addEventListener("userInput", function(event)
+            if event.phase == "submitted" then
+                self:handleSend()
+            end
+        end)
+        return inputField
     end)
+    
+    if not success then
+        print("Warning: Native text field not available, using fallback")
+        -- Create a clickable text input simulation
+        inputField = display.newText({
+            text = "Click to type message",
+            x = _w/2,
+            y = _h - 80,
+            font = native.systemFont,
+            fontSize = 16
+        })
+        inputField:setFillColor(0.5, 0.5, 0.5, 1)
+        inputField.text = ""
+        inputField.isSimulated = true
+        
+        -- Add tap handler for simulated input
+        inputField:addEventListener("tap", function()
+            self:showTextInputDialog()
+        end)
+    end
     
     -- Send button
     sendButton = display.newRoundedRect(_w - 60, _h - 80, 50, 40, 20)
@@ -245,21 +262,89 @@ function UIManager:updateMemoryStats(stats)
     end
 end
 
--- Handle send button
-function UIManager:handleSend()
-    -- Demo mode: cycle through sample messages
-    local demoMessages = {
-        "Hello! How are you today?",
-        "What is artificial intelligence?",
-        "Tell me about programming",
-        "How does the internet work?",
-        "What is the weather like?"
-    }
+-- Show text input dialog for simulator
+function UIManager:showTextInputDialog()
+    -- Create a simple input dialog
+    local dialogBg = display.newRoundedRect(display.actualContentWidth/2, display.actualContentHeight/2, 300, 150, 20)
+    dialogBg:setFillColor(1, 1, 1, 0.95)
+    dialogBg:setStrokeColor(0.7, 0.7, 0.7, 1)
+    dialogBg.strokeWidth = 2
     
-    local demoIndex = (self.demoCounter or 0) % #demoMessages + 1
-    local text = demoMessages[demoIndex]
-    self.demoCounter = (self.demoCounter or 0) + 1
+    local title = display.newText({
+        text = "Enter your message:",
+        x = display.actualContentWidth/2,
+        y = display.actualContentHeight/2 - 40,
+        font = native.systemFont,
+        fontSize = 16
+    })
+    title:setFillColor(0.2, 0.2, 0.2, 1)
     
+    -- Create input field for dialog
+    local dialogInput = native.newTextField(display.actualContentWidth/2, display.actualContentHeight/2, 250, 30)
+    dialogInput.placeholder = "Type here..."
+    dialogInput.font = native.newFont(native.systemFont, 14)
+    
+    -- Send button for dialog
+    local sendBtn = display.newRoundedRect(display.actualContentWidth/2 + 80, display.actualContentHeight/2 + 30, 60, 30, 15)
+    sendBtn:setFillColor(0.2, 0.6, 1.0, 0.9)
+    
+    local sendText = display.newText({
+        text = "Send",
+        x = sendBtn.x,
+        y = sendBtn.y,
+        font = native.systemFont,
+        fontSize = 12
+    })
+    sendText:setFillColor(1, 1, 1, 1)
+    
+    -- Cancel button
+    local cancelBtn = display.newRoundedRect(display.actualContentWidth/2 - 80, display.actualContentHeight/2 + 30, 60, 30, 15)
+    cancelBtn:setFillColor(0.7, 0.7, 0.7, 0.9)
+    
+    local cancelText = display.newText({
+        text = "Cancel",
+        x = cancelBtn.x,
+        y = cancelBtn.y,
+        font = native.systemFont,
+        fontSize = 12
+    })
+    cancelText:setFillColor(1, 1, 1, 1)
+    
+    -- Handle send button
+    sendBtn:addEventListener("tap", function()
+        local userText = dialogInput.text
+        if userText and userText ~= "" then
+            self:processUserInput(userText)
+        end
+        
+        -- Remove dialog elements
+        dialogBg:removeSelf()
+        title:removeSelf()
+        dialogInput:removeSelf()
+        sendBtn:removeSelf()
+        sendText:removeSelf()
+        cancelBtn:removeSelf()
+        cancelText:removeSelf()
+    end)
+    
+    -- Handle cancel button
+    cancelBtn:addEventListener("tap", function()
+        -- Remove dialog elements
+        dialogBg:removeSelf()
+        title:removeSelf()
+        dialogInput:removeSelf()
+        sendBtn:removeSelf()
+        sendText:removeSelf()
+        cancelBtn:removeSelf()
+        cancelText:removeSelf()
+    end)
+    
+    -- Focus on input field
+    dialogInput:setTextColor(0, 0, 0, 1)
+end
+
+-- Process user input
+function UIManager:processUserInput(text)
     if text and text ~= "" then
         -- Add user message to chat
         self:addChatBubble(text, true)
@@ -299,6 +384,39 @@ function UIManager:handleSend()
             local response = fallbackResponses[math.random(1, #fallbackResponses)]
             self:addChatBubble(response, false)
             self:updateStatus("AI Assistant - Demo Mode")
+        end
+    end
+end
+
+-- Handle send button
+function UIManager:handleSend()
+    -- Check if we have a real text field
+    if inputField and inputField.text then
+        local text = inputField.text
+        if text and text ~= "" then
+            self:processUserInput(text)
+            -- Clear the input field
+            inputField.text = ""
+            if inputField.setText then
+                inputField:setText("")
+            end
+        end
+    else
+        -- Fallback to demo mode if no real input
+        local demoMessages = {
+            "Hello! How are you today?",
+            "What is artificial intelligence?",
+            "Tell me about programming",
+            "How does the internet work?",
+            "What is the weather like?"
+        }
+        
+        local demoIndex = (self.demoCounter or 0) % #demoMessages + 1
+        local text = demoMessages[demoIndex]
+        self.demoCounter = (self.demoCounter or 0) + 1
+        
+        if text and text ~= "" then
+            self:processUserInput(text)
         end
     end
 end
