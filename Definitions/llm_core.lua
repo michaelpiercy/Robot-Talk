@@ -1,3 +1,6 @@
+-- LLM Core for Caleb's AI Assistant
+-- Solar2D compatible implementation
+
 local LLMCore = {}
 
 -- Conversation memory
@@ -69,9 +72,18 @@ local responsePatterns = {
     }
 }
 
--- Natural language processing functions
+-- Analyze input
 function LLMCore:analyzeInput(input)
-    local input = string.lower(input)
+    if not input then
+        return {
+            intent = "general",
+            confidence = 0,
+            keywords = {},
+            sentiment = "neutral"
+        }
+    end
+    
+    local inputLower = string.lower(input)
     local analysis = {
         intent = "general",
         confidence = 0,
@@ -80,14 +92,14 @@ function LLMCore:analyzeInput(input)
     }
     
     -- Extract keywords
-    for word in input:gmatch("%w+") do
+    for word in inputLower:gmatch("%w+") do
         table.insert(analysis.keywords, word)
     end
     
     -- Determine intent based on patterns
     for intent, data in pairs(responsePatterns) do
         for _, pattern in ipairs(data.patterns) do
-            if input:find(pattern) then
+            if inputLower:find(pattern) then
                 analysis.intent = intent
                 analysis.confidence = analysis.confidence + 0.3
                 break
@@ -100,14 +112,14 @@ function LLMCore:analyzeInput(input)
     local negativeWords = {"bad", "terrible", "hate", "awful", "sad", "angry", "dislike", "horrible"}
     
     for _, word in ipairs(positiveWords) do
-        if input:find(word) then
+        if inputLower:find(word) then
             analysis.sentiment = "positive"
             break
         end
     end
     
     for _, word in ipairs(negativeWords) do
-        if input:find(word) then
+        if inputLower:find(word) then
             analysis.sentiment = "negative"
             break
         end
@@ -116,6 +128,7 @@ function LLMCore:analyzeInput(input)
     return analysis
 end
 
+-- Generate response
 function LLMCore:generateResponse(input, analysis)
     local response = ""
     
@@ -123,13 +136,16 @@ function LLMCore:generateResponse(input, analysis)
     local context = self:getContext()
     
     -- Try to use knowledge base for intelligent responses
-    local KnowledgeBase = require("Definitions.knowledge_base")
-    local knowledgeResponse = KnowledgeBase:generateIntelligentResponse(input)
+    local success, KnowledgeBase = pcall(require, "Definitions.knowledge_base")
+    if success then
+        local knowledgeResponse = KnowledgeBase:generateIntelligentResponse(input)
+        if knowledgeResponse and knowledgeResponse ~= "" then
+            response = knowledgeResponse
+        end
+    end
     
-    if knowledgeResponse and knowledgeResponse ~= "" then
-        response = knowledgeResponse
-    else
-        -- Generate response based on intent
+    -- If no knowledge base response, use pattern matching
+    if response == "" then
         if responsePatterns[analysis.intent] then
             local responses = responsePatterns[analysis.intent].responses
             response = responses[math.random(1, #responses)]
@@ -162,6 +178,7 @@ function LLMCore:generateResponse(input, analysis)
     return response
 end
 
+-- Get context
 function LLMCore:getContext()
     if #conversationHistory > 0 then
         return {
@@ -173,7 +190,12 @@ function LLMCore:getContext()
     return nil
 end
 
+-- Process input
 function LLMCore:processInput(userInput)
+    if not userInput then
+        return "I didn't catch that. Could you please repeat?"
+    end
+    
     -- Analyze the input
     local analysis = self:analyzeInput(userInput)
     
@@ -198,15 +220,18 @@ function LLMCore:processInput(userInput)
     return response
 end
 
+-- Get conversation history
 function LLMCore:getConversationHistory()
     return conversationHistory
 end
 
+-- Clear memory
 function LLMCore:clearMemory()
     conversationHistory = {}
     contextMemory = {}
 end
 
+-- Get memory stats
 function LLMCore:getMemoryStats()
     return {
         conversationCount = #conversationHistory,

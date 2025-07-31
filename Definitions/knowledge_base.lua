@@ -1,3 +1,6 @@
+-- Knowledge Base for Caleb's AI Assistant
+-- Solar2D compatible implementation
+
 local KnowledgeBase = {}
 
 -- Knowledge categories
@@ -135,6 +138,7 @@ local responsePatterns = {
     }
 }
 
+-- Get response from knowledge base
 function KnowledgeBase:getResponse(category, topic)
     if knowledge[category] and knowledge[category][topic] then
         local responses = knowledge[category][topic]
@@ -143,7 +147,10 @@ function KnowledgeBase:getResponse(category, topic)
     return nil
 end
 
+-- Find relevant information
 function KnowledgeBase:findRelevantInfo(input)
+    if not input then return {} end
+    
     local inputLower = string.lower(input)
     local relevantInfo = {}
     
@@ -163,6 +170,7 @@ function KnowledgeBase:findRelevantInfo(input)
     return relevantInfo
 end
 
+-- Get response pattern
 function KnowledgeBase:getResponsePattern(questionType)
     if responsePatterns[questionType] then
         return responsePatterns[questionType][math.random(1, #responsePatterns[questionType])]
@@ -170,7 +178,16 @@ function KnowledgeBase:getResponsePattern(questionType)
     return "Let me help you with that."
 end
 
+-- Analyze question
 function KnowledgeBase:analyzeQuestion(input)
+    if not input then
+        return {
+            questionType = "general",
+            relevantInfo = {},
+            hasRelevantInfo = false
+        }
+    end
+    
     local inputLower = string.lower(input)
     local questionType = "general"
     
@@ -197,7 +214,12 @@ function KnowledgeBase:analyzeQuestion(input)
     }
 end
 
+-- Generate intelligent response
 function KnowledgeBase:generateIntelligentResponse(input)
+    if not input then
+        return "I didn't catch that. Could you please repeat?"
+    end
+    
     local analysis = self:analyzeQuestion(input)
     local response = ""
     
@@ -213,6 +235,7 @@ function KnowledgeBase:generateIntelligentResponse(input)
     return response
 end
 
+-- Get random fact
 function KnowledgeBase:getRandomFact()
     local categories = {"technology", "science", "math", "history", "entertainment"}
     local category = categories[math.random(1, #categories)]

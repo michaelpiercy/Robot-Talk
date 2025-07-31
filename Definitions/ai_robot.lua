@@ -1,6 +1,9 @@
+-- AI Robot for Caleb's AI Assistant
+-- Solar2D compatible implementation
+
 local AIRobot = {}
 
--- Robot personality and state
+-- Robot state
 local robotState = {
     mood = "neutral",
     energy = 100,
@@ -20,8 +23,7 @@ local animations = {
     thinking = {
         duration = 1000,
         scale = {1.0, 1.1, 1.0},
-        alpha = {1.0, 0.8, 1.0},
-        rotation = {0, 5, -5, 0}
+        alpha = {1.0, 0.8, 1.0}
     },
     excited = {
         duration = 500,
@@ -57,15 +59,26 @@ local personalityResponses = {
     }
 }
 
+-- Create new AI Robot instance
 function AIRobot:new()
-    local robot = setmetatable({}, { __index = AIRobot })
+    local robot = {}
+    setmetatable(robot, { __index = AIRobot })
+    
     robot.sprite = nil
     robot.animationTimer = nil
     robot.personality = "helpful"
+    robot.personalityIndicator = nil
+    robot.energyBar = nil
+    robot.moodIndicator = nil
+    
     return robot
 end
 
+-- Create robot sprite
 function AIRobot:createSprite()
+    local _w = display.actualContentWidth
+    local _h = display.actualContentHeight
+    
     -- Create robot sprite
     self.sprite = display.newImageRect("robot.png", 135, 306)
     self.sprite.x = _w/2
@@ -94,6 +107,7 @@ function AIRobot:createSprite()
     return self.sprite
 end
 
+-- Start idle animation
 function AIRobot:startIdleAnimation()
     if self.animationTimer then
         timer.cancel(self.animationTimer)
@@ -101,28 +115,33 @@ function AIRobot:startIdleAnimation()
     
     local anim = animations.idle
     self.animationTimer = timer.performWithDelay(anim.duration, function()
-        transition.to(self.sprite, {
-            time = anim.duration/2,
-            xScale = anim.scale[2],
-            yScale = anim.scale[2],
-            onComplete = function()
-                transition.to(self.sprite, {
-                    time = anim.duration/2,
-                    xScale = anim.scale[1],
-                    yScale = anim.scale[1]
-                })
-            end
-        })
+        if self.sprite then
+            transition.to(self.sprite, {
+                time = anim.duration/2,
+                xScale = anim.scale[2],
+                yScale = anim.scale[2],
+                onComplete = function()
+                    if self.sprite then
+                        transition.to(self.sprite, {
+                            time = anim.duration/2,
+                            xScale = anim.scale[1],
+                            yScale = anim.scale[1]
+                        })
+                    end
+                end
+            })
+        end
     end, -1)
 end
 
+-- Play animation
 function AIRobot:playAnimation(animationName)
     if self.animationTimer then
         timer.cancel(self.animationTimer)
     end
     
     local anim = animations[animationName]
-    if not anim then return end
+    if not anim or not self.sprite then return end
     
     robotState.currentAnimation = animationName
     
@@ -133,17 +152,19 @@ function AIRobot:playAnimation(animationName)
         yScale = anim.scale[2],
         alpha = anim.alpha[2],
         onComplete = function()
-            transition.to(self.sprite, {
-                time = anim.duration/2,
-                xScale = anim.scale[1],
-                yScale = anim.scale[1],
-                alpha = anim.alpha[1],
-                onComplete = function()
-                    if animationName ~= "idle" then
-                        self:startIdleAnimation()
+            if self.sprite then
+                transition.to(self.sprite, {
+                    time = anim.duration/2,
+                    xScale = anim.scale[1],
+                    yScale = anim.scale[1],
+                    alpha = anim.alpha[1],
+                    onComplete = function()
+                        if animationName ~= "idle" then
+                            self:startIdleAnimation()
+                        end
                     end
-                end
-            })
+                })
+            end
         end
     })
     
@@ -155,11 +176,12 @@ function AIRobot:playAnimation(animationName)
         thinking = {0.8, 0.8, 0.2, 0.8}
     }
     
-    if colors[animationName] then
+    if colors[animationName] and self.personalityIndicator then
         self.personalityIndicator:setFillColor(unpack(colors[animationName]))
     end
 end
 
+-- Update mood
 function AIRobot:updateMood(sentiment)
     robotState.mood = sentiment
     
@@ -180,6 +202,7 @@ function AIRobot:updateMood(sentiment)
     self:updateEnergyBar()
 end
 
+-- Update energy bar
 function AIRobot:updateEnergyBar()
     if self.energyBar then
         local energyPercent = robotState.energy / 100
@@ -200,7 +223,10 @@ function AIRobot:updateEnergyBar()
     end
 end
 
+-- Process input
 function AIRobot:processInput(input)
+    if not input then return "neutral" end
+    
     -- Analyze sentiment
     local sentiment = "neutral"
     local inputLower = string.lower(input)
@@ -233,11 +259,13 @@ function AIRobot:processInput(input)
     return sentiment
 end
 
+-- Get personality response
 function AIRobot:getPersonalityResponse(responseType)
     local responses = personalityResponses[self.personality]
     return responses[responseType] or "Processing..."
 end
 
+-- Set personality
 function AIRobot:setPersonality(personality)
     self.personality = personality
     robotState.personality = personality
@@ -254,10 +282,12 @@ function AIRobot:setPersonality(personality)
     end
 end
 
+-- Get state
 function AIRobot:getState()
     return robotState
 end
 
+-- Cleanup
 function AIRobot:cleanup()
     if self.animationTimer then
         timer.cancel(self.animationTimer)
