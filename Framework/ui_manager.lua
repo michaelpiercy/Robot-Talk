@@ -64,8 +64,8 @@ local function createInstanceState()
         displayWidth = display.actualContentWidth,
         displayHeight = display.actualContentHeight,
         
-        -- Debug mode
-        debugMode = false,
+        -- Debug mode (enabled by default)
+        debugMode = true,
         conversationLog = {}
     }
 end
@@ -217,6 +217,19 @@ function UIManager:createChatContainer()
         -- Insert messages group into chat container
         self.state.chatContainer:insert(self.state.chatContainer.messagesGroup)
         debugPrint("Messages group created and inserted")
+        
+        -- Add a visual debug indicator to show the messages group boundaries
+        if self.state.debugMode then
+            ---@type DisplayObject
+            local debugBorder = display.newRect(0, 0, self.state.chatContainer.messagesGroup.width, self.state.chatContainer.messagesGroup.height)
+            if debugBorder then
+                debugBorder:setFillColor(0, 0, 0, 0)  -- Transparent fill
+                debugBorder:setStrokeColor(1, 0, 0, 0.5)  -- Red border for debugging
+                debugBorder.strokeWidth = 1
+                self.state.chatContainer.messagesGroup:insert(debugBorder)
+                debugPrint("Debug border added to messages group")
+            end
+        end
     end
     
     -- Initialize message tracking
@@ -630,6 +643,7 @@ function UIManager:addChatBubble(text, isUser)
     
     debugPrint("Adding chat bubble: " .. (isUser and "User" or "AI") .. " - " .. text)
     debugPrint("Messages group children before: " .. self.state.chatContainer.messagesGroup.numChildren)
+    debugPrint("Current Y position: " .. (self.state.chatContainer.currentY or "nil"))
     
     ---@class BubbleStyle
     ---@field backgroundColor number[] Background color RGBA values
@@ -693,27 +707,38 @@ function UIManager:addChatBubble(text, isUser)
         bubbleGroup:insert(bubble)
         bubbleGroup:insert(textObj)
         
-        -- Position bubble properly within the messages group
+        -- Calculate bubble position within the messages group
+        local bubbleX, bubbleY
+        
         if isUser then
-            bubbleGroup.x = self.state.chatContainer.messagesGroup.width - bubble.width/2 - 20
+            -- User bubbles on the right
+            bubbleX = self.state.chatContainer.messagesGroup.width - bubble.width/2 - 20
         else
-            bubbleGroup.x = bubble.width/2 + 20
+            -- AI bubbles on the left
+            bubbleX = bubble.width/2 + 20
         end
         
         -- Position vertically with proper spacing
-        bubbleGroup.y = self.state.chatContainer.currentY + 30
+        bubbleY = (self.state.chatContainer.currentY or 10) + 30
+        
+        -- Set bubble position
+        bubbleGroup.x = bubbleX
+        bubbleGroup.y = bubbleY
+        
+        debugPrint("Bubble positioned at: " .. bubbleX .. ", " .. bubbleY)
+        debugPrint("Messages group size: " .. self.state.chatContainer.messagesGroup.width .. " x " .. self.state.chatContainer.messagesGroup.height)
         
         -- Add to messages group
         self.state.chatContainer.messagesGroup:insert(bubbleGroup)
         
-        debugPrint("Bubble positioned at: " .. bubbleGroup.x .. ", " .. bubbleGroup.y)
         debugPrint("Messages group children after: " .. self.state.chatContainer.messagesGroup.numChildren)
         
-        -- Update current Y position
-        self.state.chatContainer.currentY = self.state.chatContainer.currentY + 80
+        -- Update current Y position for next bubble
+        self.state.chatContainer.currentY = bubbleY + 50
         
-        -- Simple auto-scroll
-        if self.state.chatContainer.currentY > self.state.chatContainer.maxY then
+        -- Simple auto-scroll if we're running out of space
+        if self.state.chatContainer.currentY > (self.state.chatContainer.maxY or 400) then
+            debugPrint("Auto-scrolling messages...")
             for i = 1, self.state.chatContainer.messagesGroup.numChildren do
                 local child = self.state.chatContainer.messagesGroup[i]
                 if child and child.y then
@@ -789,15 +814,29 @@ end
 function UIManager:handleClearMemory()
     debugPrint("Clearing memory and conversation")
     
-    -- Clear chat display
+    -- Clear chat display properly
     if self.state.chatContainer and self.state.chatContainer.messagesGroup then
+        debugPrint("Removing old messages group")
         self.state.chatContainer.messagesGroup:removeSelf()
+        
+        -- Create new messages group with proper positioning
         self.state.chatContainer.messagesGroup = display.newGroup()
         if self.state.chatContainer.messagesGroup then
+            -- Position messages group at the top of the chat container
             self.state.chatContainer.messagesGroup.x = 0
             self.state.chatContainer.messagesGroup.y = 0
+            self.state.chatContainer.messagesGroup.width = self.state.chatContainer.width - 20
+            self.state.chatContainer.messagesGroup.height = self.state.chatContainer.height - 20
+            
+            -- Insert messages group into chat container
             self.state.chatContainer:insert(self.state.chatContainer.messagesGroup)
+            
+            -- Reset message tracking
             self.state.chatContainer.currentY = 10
+            self.state.chatContainer.maxY = self.state.chatContainer.height - 20
+            
+            debugPrint("New messages group created and positioned")
+            debugPrint("Messages group children: " .. self.state.chatContainer.messagesGroup.numChildren)
         end
     end
     
