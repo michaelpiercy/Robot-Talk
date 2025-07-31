@@ -32,6 +32,8 @@ local UIManager = {}
 ---@field demoCounter number Counter for demo messages
 ---@field displayWidth number The display width in pixels
 ---@field displayHeight number The display height in pixels
+---@field debugMode boolean Whether debug mode is enabled
+---@field conversationLog string[] Array of conversation messages for debugging
 
 ---Instance-specific state (not module globals)
 ---@return UIState The initialized UI state
@@ -60,7 +62,11 @@ local function createInstanceState()
         
         -- Display dimensions (instance-specific)
         displayWidth = display.actualContentWidth,
-        displayHeight = display.actualContentHeight
+        displayHeight = display.actualContentHeight,
+        
+        -- Debug mode
+        debugMode = false,
+        conversationLog = {}
     }
 end
 
@@ -100,6 +106,12 @@ local function validateInput(text)
     return true, sanitized
 end
 
+---Debug print function
+---@param message string The debug message to print
+local function debugPrint(message)
+    print("[UI DEBUG] " .. message)
+end
+
 -- ============================================================================
 -- INSTANCE METHODS (PROPER SCOPE)
 -- ============================================================================
@@ -124,7 +136,7 @@ function UIManager:init()
         return true
     end
     
-    print("Initializing UI Manager...")
+    debugPrint("Initializing UI Manager...")
     
     -- Validate display dimensions
     if not self.state.displayWidth or not self.state.displayHeight then
@@ -154,7 +166,7 @@ function UIManager:init()
     end
     
     self.state.isInitialized = true
-    print("✓ UI Manager initialized successfully!")
+    debugPrint("✓ UI Manager initialized successfully!")
     return true
 end
 
@@ -172,10 +184,11 @@ function UIManager:createChatContainer()
         return false
     end
     
+    -- Position chat container properly
     self.state.chatContainer.x = self.state.displayWidth/2
-    self.state.chatContainer.y = self.state.displayHeight/2 - 100
+    self.state.chatContainer.y = self.state.displayHeight/2 - 50  -- Moved up for better visibility
     self.state.chatContainer.width = self.state.displayWidth - 40
-    self.state.chatContainer.height = self.state.displayHeight - 200
+    self.state.chatContainer.height = self.state.displayHeight - 250  -- Increased height
     
     -- Create chat background
     ---@type DisplayObject
@@ -201,6 +214,7 @@ function UIManager:createChatContainer()
     self.state.chatContainer.currentY = 10
     self.state.chatContainer.maxY = self.state.chatContainer.height - 20
     
+    debugPrint("Chat container created at position: " .. self.state.chatContainer.x .. ", " .. self.state.chatContainer.y)
     return true
 end
 
@@ -505,21 +519,30 @@ function UIManager:processUserInput(text)
         return
     end
     
+    debugPrint("Processing user input: " .. sanitizedText)
+    
     -- Add user message to chat
     self:addChatBubble(sanitizedText, true)
+    
+    -- Log conversation for debugging
+    table.insert(self.state.conversationLog, "User: " .. sanitizedText)
     
     -- Update status
     self:updateStatus("AI Assistant - Processing...")
     
     -- Process with LLM (using injected dependencies)
     if self.state.llmCore then
+        debugPrint("LLM Core available, processing with AI...")
+        
         -- Process input with AI robot for visual feedback
         if self.state.aiRobot and self.state.aiRobot.processInput then
             local robotSuccess, robotErr = pcall(function()
                 self.state.aiRobot:processInput(sanitizedText)
             end)
             if not robotSuccess then
-                print("Warning: Robot processing failed:", robotErr)
+                debugPrint("Warning: Robot processing failed: " .. tostring(robotErr))
+            else
+                debugPrint("✓ Robot processed input successfully")
             end
         end
         
@@ -529,8 +552,13 @@ function UIManager:processUserInput(text)
         end)
         
         if responseSuccess and response then
+            debugPrint("AI Response: " .. response)
+            
             -- Add AI response to chat
             self:addChatBubble(response, false)
+            
+            -- Log conversation for debugging
+            table.insert(self.state.conversationLog, "AI: " .. response)
             
             -- Update memory stats
             local statsSuccess, stats = pcall(function()
@@ -544,10 +572,12 @@ function UIManager:processUserInput(text)
                 self:updateStatus("AI Assistant - Response Generated")
             end
         else
+            debugPrint("Warning: LLM response generation failed")
             self:addChatBubble("I'm having trouble processing that right now.", false)
             self:updateStatus("AI Assistant - Processing Error")
         end
     else
+        debugPrint("LLM Core not available, using fallback response")
         -- Fallback response
         local fallbackResponses = {
             "That's an interesting question!",
@@ -559,6 +589,18 @@ function UIManager:processUserInput(text)
         local response = fallbackResponses[math.random(1, #fallbackResponses)]
         self:addChatBubble(response, false)
         self:updateStatus("AI Assistant - Demo Mode")
+        
+        -- Log conversation for debugging
+        table.insert(self.state.conversationLog, "AI: " .. response)
+    end
+    
+    -- Print conversation log if debug mode is enabled
+    if self.state.debugMode then
+        debugPrint("=== CONVERSATION LOG ===")
+        for i, message in ipairs(self.state.conversationLog) do
+            debugPrint(i .. ". " .. message)
+        end
+        debugPrint("========================")
     end
 end
 
@@ -576,6 +618,8 @@ function UIManager:addChatBubble(text, isUser)
         print("Error: Chat container not initialized")
         return
     end
+    
+    debugPrint("Adding chat bubble: " .. (isUser and "User" or "AI") .. " - " .. text)
     
     ---@class BubbleStyle
     ---@field backgroundColor number[] Background color RGBA values
@@ -639,18 +683,20 @@ function UIManager:addChatBubble(text, isUser)
         bubbleGroup:insert(bubble)
         bubbleGroup:insert(textObj)
         
-        -- Position bubble
+        -- Position bubble properly
         if isUser then
             bubbleGroup.x = self.state.chatContainer.width - bubble.width/2 - 20
         else
             bubbleGroup.x = bubble.width/2 + 20
         end
         
-        -- Position vertically
+        -- Position vertically with proper spacing
         bubbleGroup.y = self.state.chatContainer.currentY + 30
         
         -- Add to messages group
         self.state.chatContainer.messagesGroup:insert(bubbleGroup)
+        
+        debugPrint("Bubble positioned at: " .. bubbleGroup.x .. ", " .. bubbleGroup.y)
         
         -- Update current Y position
         self.state.chatContainer.currentY = self.state.chatContainer.currentY + 80
@@ -675,6 +721,7 @@ end
 function UIManager:updateStatus(text)
     if self.state.statusLabel and text then
         self.state.statusLabel.text = text
+        debugPrint("Status updated: " .. text)
     end
 end
 
@@ -683,11 +730,14 @@ end
 function UIManager:updateMemoryStats(stats)
     if self.state.memoryLabel and stats then
         self.state.memoryLabel.text = "Memory: " .. (stats.conversationCount or 0) .. " conversations"
+        debugPrint("Memory stats updated: " .. (stats.conversationCount or 0) .. " conversations")
     end
 end
 
 ---Handle send button with instance scope
 function UIManager:handleSend()
+    debugPrint("Send button pressed")
+    
     -- Check if we have a real text field
     if self.state.inputField and self.state.inputField.text then
         local text = self.state.inputField.text
@@ -704,6 +754,7 @@ function UIManager:handleSend()
             print("Input validation failed:", sanitizedText)
         end
     else
+        debugPrint("No real input field, using demo mode")
         -- Fallback to demo mode if no real input
         local demoMessages = {
             "Hello! How are you today?",
@@ -725,6 +776,8 @@ end
 
 ---Handle clear memory with instance scope
 function UIManager:handleClearMemory()
+    debugPrint("Clearing memory and conversation")
+    
     -- Clear chat display
     if self.state.chatContainer and self.state.chatContainer.messagesGroup then
         self.state.chatContainer.messagesGroup:removeSelf()
@@ -739,6 +792,9 @@ function UIManager:handleClearMemory()
     
     -- Reset demo counter
     self.state.demoCounter = 0
+    
+    -- Clear conversation log
+    self.state.conversationLog = {}
     
     -- Update displays
     self:updateStatus("Memory cleared - AI Assistant Ready")

@@ -9,6 +9,7 @@
 ---@field contextMemory table<string, ContextEntry> Context memory storage
 ---@field userPreferences table<string, PreferenceEntry> User preference storage
 ---@field conversationCount number Total number of conversations processed
+---@field debugMode boolean Whether debug mode is enabled
 
 local LLMCore = {}
 
@@ -51,6 +52,8 @@ local contextMemory = {}
 local userPreferences = {}
 ---@type number
 local conversationCount = 0
+---@type boolean
+local debugMode = false
 
 -- ============================================================================
 -- RESPONSE PATTERNS
@@ -126,6 +129,14 @@ local function validateInput(input)
     return true, sanitized
 end
 
+---Debug print function
+---@param message string The debug message to print
+local function debugPrint(message)
+    if debugMode then
+        print("[LLM DEBUG] " .. message)
+    end
+end
+
 -- ============================================================================
 -- CORE LLM FUNCTIONALITY
 -- ============================================================================
@@ -135,7 +146,7 @@ end
 ---@return InputAnalysis The analysis result
 function LLMCore:analyzeInput(input)
     if not input then
-        print("Warning: No input provided for analysis")
+        debugPrint("Warning: No input provided for analysis")
         return {
             intent = "confusion",
             sentiment = "neutral",
@@ -143,6 +154,8 @@ function LLMCore:analyzeInput(input)
             confidence = 0
         }
     end
+    
+    debugPrint("Analyzing input: " .. input)
     
     local inputLower = string.lower(input)
     ---@type InputAnalysis
@@ -162,6 +175,8 @@ function LLMCore:analyzeInput(input)
     end
     analysis.keywords = words
     
+    debugPrint("Extracted keywords: " .. table.concat(words, ", "))
+    
     -- Detect intent
     ---@type string[]
     local greetingWords = {"hello", "hi", "hey", "greetings", "good morning", "good afternoon", "good evening"}
@@ -174,6 +189,7 @@ function LLMCore:analyzeInput(input)
         if string.find(inputLower, word) then
             analysis.intent = "greeting"
             analysis.confidence = 0.8
+            debugPrint("Detected intent: greeting")
             break
         end
     end
@@ -182,6 +198,7 @@ function LLMCore:analyzeInput(input)
         if string.find(inputLower, word) then
             analysis.intent = "farewell"
             analysis.confidence = 0.8
+            debugPrint("Detected intent: farewell")
             break
         end
     end
@@ -190,6 +207,7 @@ function LLMCore:analyzeInput(input)
         if string.find(inputLower, word) then
             analysis.intent = "question"
             analysis.confidence = 0.7
+            debugPrint("Detected intent: question")
             break
         end
     end
@@ -217,9 +235,15 @@ function LLMCore:analyzeInput(input)
     
     if positiveCount > negativeCount then
         analysis.sentiment = "positive"
+        debugPrint("Detected sentiment: positive")
     elseif negativeCount > positiveCount then
         analysis.sentiment = "negative"
+        debugPrint("Detected sentiment: negative")
+    else
+        debugPrint("Detected sentiment: neutral")
     end
+    
+    debugPrint("Analysis complete - Intent: " .. analysis.intent .. ", Sentiment: " .. analysis.sentiment .. ", Confidence: " .. analysis.confidence)
     
     return analysis
 end
@@ -230,36 +254,49 @@ end
 ---@return string The generated response
 function LLMCore:generateResponse(analysis, context)
     if not analysis or not analysis.intent then
-        print("Warning: Invalid analysis for response generation")
+        debugPrint("Warning: Invalid analysis for response generation")
         return "I'm here to help!"
     end
+    
+    debugPrint("Generating response for intent: " .. analysis.intent)
     
     local response = ""
     
     -- Try to get knowledge-based response first
     local KnowledgeBase = safeRequire("Definitions.knowledge_base")
     if KnowledgeBase then
+        debugPrint("Knowledge Base available, attempting intelligent response")
         local knowledgeResponse = KnowledgeBase:generateIntelligentResponse(analysis.keywords)
         if knowledgeResponse and knowledgeResponse ~= "" then
             response = knowledgeResponse
+            debugPrint("Knowledge-based response generated: " .. response)
+        else
+            debugPrint("No knowledge-based response found")
         end
+    else
+        debugPrint("Knowledge Base not available")
     end
     
     -- Fallback to pattern-based response
     if response == "" then
+        debugPrint("Using pattern-based response")
         local patterns = responsePatterns[analysis.intent]
         if patterns and #patterns > 0 then
             response = patterns[math.random(1, #patterns)]
+            debugPrint("Pattern-based response selected: " .. response)
         else
             response = "I understand what you're saying."
+            debugPrint("Default response used")
         end
     end
     
     -- Add context-aware elements
     if context and context.lastTopic then
         response = response .. " Regarding " .. context.lastTopic .. ", "
+        debugPrint("Added context-aware element")
     end
     
+    debugPrint("Final response: " .. response)
     return response
 end
 
@@ -278,6 +315,7 @@ function LLMCore:getContext()
         local lastMessage = conversationHistory[#conversationHistory]
         if lastMessage and lastMessage.keywords then
             context.lastTopic = lastMessage.keywords[1]
+            debugPrint("Last topic: " .. (context.lastTopic or "none"))
         end
     end
     
@@ -304,6 +342,8 @@ function LLMCore:getContext()
         table.insert(context.commonTopics, topics[i].topic)
     end
     
+    debugPrint("Context - Conversation length: " .. context.conversationLength .. ", Common topics: " .. table.concat(context.commonTopics, ", "))
+    
     return context
 end
 
@@ -311,9 +351,11 @@ end
 ---@param input string The user input text
 ---@return string The generated response
 function LLMCore:processInput(input)
+    debugPrint("Processing input: " .. input)
+    
     local isValid, sanitizedInput = validateInput(input)
     if not isValid then
-        print("Input validation failed:", sanitizedInput)
+        debugPrint("Input validation failed: " .. sanitizedInput)
         return "I didn't understand that. Could you please rephrase?"
     end
     
@@ -344,6 +386,8 @@ function LLMCore:processInput(input)
         table.remove(conversationHistory, 1)
     end
     
+    debugPrint("Conversation stored - Total conversations: " .. conversationCount .. ", History size: " .. #conversationHistory)
+    
     return response
 end
 
@@ -359,18 +403,21 @@ function LLMCore:clearMemory()
     contextMemory = {}
     userPreferences = {}
     conversationCount = 0
+    debugPrint("Memory cleared successfully")
     print("Memory cleared successfully")
 end
 
 ---Get memory statistics
 ---@return {conversationCount: number, historySize: number, contextSize: number, preferencesSize: number} The memory statistics
 function LLMCore:getMemoryStats()
-    return {
+    local stats = {
         conversationCount = conversationCount,
         historySize = #conversationHistory,
         contextSize = #contextMemory,
         preferencesSize = #userPreferences
     }
+    debugPrint("Memory stats - Conversations: " .. stats.conversationCount .. ", History: " .. stats.historySize)
+    return stats
 end
 
 ---Add to context memory
@@ -379,7 +426,7 @@ end
 ---@return boolean success Whether the context was added successfully
 function LLMCore:addToContext(key, value)
     if not key or not value then
-        print("Warning: Invalid context data")
+        debugPrint("Warning: Invalid context data")
         return false
     end
     
@@ -389,6 +436,7 @@ function LLMCore:addToContext(key, value)
         timestamp = os.time()
     }
     
+    debugPrint("Context added: " .. key .. " = " .. tostring(value))
     return true
 end
 
@@ -402,9 +450,11 @@ function LLMCore:getFromContext(key)
     
     local context = contextMemory[key]
     if context then
+        debugPrint("Context retrieved: " .. key .. " = " .. tostring(context.value))
         return context.value
     end
     
+    debugPrint("Context not found: " .. key)
     return nil
 end
 
@@ -414,7 +464,7 @@ end
 ---@return boolean success Whether the preference was added successfully
 function LLMCore:addUserPreference(preference, value)
     if not preference or not value then
-        print("Warning: Invalid preference data")
+        debugPrint("Warning: Invalid preference data")
         return false
     end
     
@@ -424,6 +474,7 @@ function LLMCore:addUserPreference(preference, value)
         timestamp = os.time()
     }
     
+    debugPrint("Preference added: " .. preference .. " = " .. tostring(value))
     return true
 end
 
@@ -437,10 +488,19 @@ function LLMCore:getUserPreference(preference)
     
     local pref = userPreferences[preference]
     if pref then
+        debugPrint("Preference retrieved: " .. preference .. " = " .. tostring(pref.value))
         return pref.value
     end
     
+    debugPrint("Preference not found: " .. preference)
     return nil
+end
+
+---Set debug mode
+---@param enabled boolean Whether to enable debug mode
+function LLMCore:setDebugMode(enabled)
+    debugMode = enabled
+    debugPrint("Debug mode " .. (enabled and "enabled" or "disabled"))
 end
 
 ---Constructor
@@ -448,6 +508,10 @@ end
 function LLMCore:new()
     local llm = {}
     setmetatable(llm, { __index = LLMCore })
+    
+    -- Enable debug mode by default
+    llm:setDebugMode(true)
+    
     return llm
 end
 

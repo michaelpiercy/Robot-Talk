@@ -5,9 +5,25 @@
 -- Expert-level Solar2D implementation with comprehensive error handling
 
 -- ============================================================================
+-- DEBUG CONFIGURATION
+-- ============================================================================
+
+---@type boolean Debug mode flag for console output
+local DEBUG_MODE = true
+
+---Debug print function
+---@param message string The debug message to print
+local function debugPrint(message)
+    if DEBUG_MODE then
+        print("[DEBUG] " .. message)
+    end
+end
+
+-- ============================================================================
 -- DEPENDENCY MANAGEMENT & SCOPE CONTROL
 -- ============================================================================
 
+-- Get display dimensions (must be first)
 ---@type number Display width in pixels
 local _w = display.actualContentWidth
 ---@type number Display height in pixels
@@ -49,6 +65,7 @@ local app = {
     isShuttingDown = false
 }
 
+-- Personality options (immutable configuration)
 ---@type string[] Personality options (immutable configuration)
 local personalities = {
     "helpful",
@@ -61,7 +78,7 @@ local personalities = {
 -- SAFETY & ERROR HANDLING FUNCTIONS
 -- ============================================================================
 
----Safe module loading with dependency tracking
+-- Safe module loading with dependency tracking
 ---@param modulePath string The path to the module to load
 ---@param dependencyName? string The name to store the module under in app.modules
 ---@return any|nil The loaded module or nil if failed
@@ -75,7 +92,7 @@ local function safeRequire(modulePath, dependencyName)
     if success then
         if dependencyName then
             app.modules[dependencyName] = result
-            print("✓ Loaded module:", dependencyName)
+            debugPrint("✓ Loaded module: " .. dependencyName)
         end
         return result
     else
@@ -84,7 +101,7 @@ local function safeRequire(modulePath, dependencyName)
     end
 end
 
----Safe function call wrapper with scope validation
+-- Safe function call wrapper with scope validation
 ---@param func function|nil The function to call
 ---@param context table|nil The context object (self) for the function
 ---@param ... any Additional arguments to pass to the function
@@ -117,10 +134,10 @@ end
 -- MODULE INITIALIZATION (DEPENDENCY ORDER)
 -- ============================================================================
 
----Initialize modules in dependency order
+-- Initialize modules in dependency order
 ---@return boolean success Whether all critical modules were loaded successfully
 local function initializeModules()
-    print("Initializing modules in dependency order...")
+    debugPrint("Initializing modules in dependency order...")
     
     -- 1. Load Knowledge Base first (no dependencies)
     local KnowledgeBase = safeRequire("Definitions.knowledge_base", "knowledgeBase")
@@ -149,7 +166,7 @@ local function initializeModules()
         return false
     end
     
-    print("✓ All modules loaded successfully")
+    debugPrint("✓ All modules loaded successfully")
     return true
 end
 
@@ -157,7 +174,7 @@ end
 -- UI COMPONENT CREATION (SCOPE ISOLATED)
 -- ============================================================================
 
----Create personality selector with proper scope
+-- Create personality selector with proper scope
 ---@return boolean success Whether the personality selector was created successfully
 local function createPersonalitySelector()
     if not _w or not _h then
@@ -240,10 +257,10 @@ end
 -- APPLICATION INITIALIZATION (EXECUTION ORDER)
 -- ============================================================================
 
----Initialize the application with proper scope and order
+-- Initialize the application with proper scope and order
 ---@return boolean success Whether the application was initialized successfully
 local function initApp()
-    print("Initializing Caleb's AI Assistant...")
+    debugPrint("Initializing Caleb's AI Assistant...")
     
     -- Step 1: Load all modules in dependency order
     if not initializeModules() then
@@ -284,7 +301,7 @@ local function initApp()
         app.modules.aiRobot = robotInstance
     end
     
-    -- Step 4: Initialize UI Manager with proper scope
+    -- Step 4: Initialize UI Manager with proper scope and dependency injection
     if app.modules.uiManager then
         ---@type UIManager
         local uiInstance = app.modules.uiManager:new()
@@ -295,11 +312,35 @@ local function initApp()
             end
         end
         
-        -- Establish proper object relationships
+        -- CRITICAL: Establish proper object relationships with dependency injection
         if uiInstance then
-            uiInstance.aiRobot = app.modules.aiRobot
-            uiInstance.llmCore = app.modules.llmCore
-            uiInstance.knowledgeBase = app.modules.knowledgeBase
+            debugPrint("Injecting dependencies into UI Manager...")
+            
+            -- Inject LLM Core instance
+            if app.modules.llmCore then
+                local llmInstance = app.modules.llmCore:new()
+                uiInstance.state.llmCore = llmInstance
+                debugPrint("✓ LLM Core injected into UI Manager")
+            else
+                debugPrint("✗ LLM Core not available for injection")
+            end
+            
+            -- Inject Knowledge Base instance
+            if app.modules.knowledgeBase then
+                local kbInstance = app.modules.knowledgeBase:new()
+                uiInstance.state.knowledgeBase = kbInstance
+                debugPrint("✓ Knowledge Base injected into UI Manager")
+            else
+                debugPrint("✗ Knowledge Base not available for injection")
+            end
+            
+            -- Inject AI Robot instance
+            uiInstance.state.aiRobot = app.modules.aiRobot
+            debugPrint("✓ AI Robot injected into UI Manager")
+            
+            -- Enable debug mode in UI Manager
+            uiInstance.state.debugMode = DEBUG_MODE
+            debugPrint("✓ Debug mode enabled in UI Manager")
         end
         app.modules.uiManager = uiInstance
     end
@@ -342,7 +383,7 @@ local function initApp()
     
     -- Step 9: Mark initialization complete
     app.isInitialized = true
-    print("✓ AI Assistant initialized successfully!")
+    debugPrint("✓ AI Assistant initialized successfully!")
     return true
 end
 
@@ -350,7 +391,7 @@ end
 -- EVENT HANDLERS (SCOPE AWARE)
 -- ============================================================================
 
----Handle keyboard events with proper scope validation
+-- Handle keyboard events with proper scope validation
 ---@param event table The keyboard event object
 ---@return boolean handled Whether the event was handled
 local function onKeyEvent(event)
@@ -369,7 +410,7 @@ local function onKeyEvent(event)
     return false
 end
 
----Handle system events with proper cleanup
+-- Handle system events with proper cleanup
 ---@param event table The system event object
 local function onSystemEvent(event)
     if event.type == "applicationExit" then
